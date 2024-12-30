@@ -1,4 +1,4 @@
-Alice went to the forest and she discovered a hidden treasure.
-Alice plays guitar and she is joyful.
-Bob and Chris got work to do but they are eager to explore.
-Bob and Chris made a sculpture while they are delighted and curious.
+['Bob and Chris made a cake while they are happy and excited.']Alice went to the beach and she found a shiny seashell.
+Alice plays guitar and she is talented.
+Bob and Chris got work to do but they are eager to jump.
+Bob and Chris made a sculpture while they are creative and adventurous.

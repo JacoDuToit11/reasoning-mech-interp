@@ -48,3 +48,6 @@ for template_type, templates in type_to_templates.items():
         responses[template] = response.choices[0].message.content
         with open(f"{data_dir}/{template_type}_filled.txt", "a") as f:
             f.write(f"{responses[template]}\n")
+
+        with open(f"{data_dir}/{template_type}_filled_list.txt", "w") as f:
+            f.write(str([responses[template]]))
