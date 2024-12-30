@@ -1,1 +1,1 @@
-['Bob and Chris made a sculpture while they are creative and adventurous.']
+['Alice went to the beach and she collected seashells.', 'Alice plays guitar and she is joyful.', 'Bob and Chris got work to do but they are tired to dance.', 'Bob and Chris made a sculpture while they are curious and vibrant.']

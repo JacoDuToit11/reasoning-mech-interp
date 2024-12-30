@@ -1,4 +1,5 @@
 import openai
+import os
 from os import environ
 
 openai.api_key = environ.get("OPENAI_API_KEY")
@@ -30,6 +31,10 @@ type_to_templates = {
 }
 
 for template_type, templates in type_to_templates.items():
+    if os.path.exists(f"{data_dir}/{template_type}_filled.txt"):
+        os.remove(f"{data_dir}/{template_type}_filled.txt")
+        os.remove(f"{data_dir}/{template_type}_filled_list.txt")
+
     for template in templates:
         prompt = (
             f"Fill in the placeholders in this template:\n{template}\n\n"
@@ -49,5 +54,8 @@ for template_type, templates in type_to_templates.items():
         with open(f"{data_dir}/{template_type}_filled.txt", "a") as f:
             f.write(f"{responses[template]}\n")
 
-        with open(f"{data_dir}/{template_type}_filled_list.txt", "w") as f:
-            f.write(str([responses[template]]))
+    with open(f"{data_dir}/{template_type}_filled.txt", "r") as f:
+        all_responses = [line.strip() for line in f.readlines()]
+    
+    with open(f"{data_dir}/{template_type}_filled_list.txt", "w") as f:
+        f.write(str(all_responses))

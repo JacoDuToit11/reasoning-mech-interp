@@ -1,1 +1,1 @@
-['Alice went to the beach because the beach is a good place for relaxation.']
+['Alice went to the park because she wanted to find a treasure.', 'Alice plays guitar because she enjoys strumming melodies.', 'Alice went to Paris because Paris is a good place for art.']
