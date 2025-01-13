@@ -229,107 +229,27 @@ def activation_patching_analysis(model):
     # activation_patching(model, template, dataset)
 
     template = "AOS"
-    dataset = {'clean_tokens': model.to_tokens(['Sara wanted to write so Mark decided to get the']),
-              'corrupted_tokens': model.to_tokens(['Sara wanted to go so Mark decided to get the', 'Sara wanted to sleep so Mark decided to get the', 'Sara wanted to play so Mark decided to get the']),
+    dataset = {'clean_tokens': model.to_tokens([
+        'Sara wanted to write so Mark decided to get the']),
+              'corrupted_tokens': model.to_tokens([
+                  'Sara wanted to go so Mark decided to get the', 
+                  'Sara wanted to sleep so Mark decided to get the', 
+                  'Sara wanted to play so Mark decided to get the']),
               'answers': [(' book', ' car'), (' book', ' room'), (' book', ' ball')]
             }
     activation_patching(model, template, dataset)
-    exit()
 
-    template = "ALB"
-    clean_tokens = model.to_tokens([
-        "John had to leave because he is going to the.",
-        "John had to run because he is going to the.",
-        "John had to rest because he is going to the.",
-        "John had to pack because he is going to the.",
-        # "John had to clean because he is going to the.",
-        # "John had to shop because he is going to the.",
-        # "John had to drive because he is going to the.",
-        # "John had to study because he is going to the.",
-        # "John had to walk because he is going to the.",
-        # "John had to wait because he is going to the.",
-        # "John had to search because he is going to the.",
-        # "John had to schedule because he is going to the.",
-        # "John had to book because he is going to the.",
-        # "John had to wake up because he is going to the.",
-        # "John had to dress because he is going to the.",
-        # "John had to organize because he is going to the.",
-        # "John had to rehearse because he is going to the.",
-        # "John had to swim because he is going to the.",
-        # "John had to eat because he is going to the.",
-        # "John had to drink because he is going to the."
-    ])
-
-    corrupted_tokens = model.to_tokens([
-        "John had to practice because he is going to the.",
-        "John had to cook because he is going to the.",
-        "John had to prepare because he is going to the.",
-        "John had to walk because he is going to the.",
-        # "John had to wash because he is going to the.",
-        # "John had to browse because he is going to the.",
-        # "John had to fix because he is going to the.",
-        # "John had to rest because he is going to the.",
-        # "John had to jog because he is going to the.",
-        # "John had to leave because he is going to the.",
-        # "John had to check because he is going to the.",
-        # "John had to adjust because he is going to the.",
-        # "John had to reserve because he is going to the.",
-        # "John had to sleep because he is going to the.",
-        # "John had to change because he is going to the.",
-        # "John had to tidy because he is going to the.",
-        # "John had to train because he is going to the.",
-        # "John had to dive because he is going to the.",
-        # "John had to snack because he is going to the.",
-        # "John had to sip because he is going to the."
-    ])
-
-    clean_answers = [
-        (" store", " park"),
-        (" gym", " restaurant"),
-        (" hospital", " school"),
-        (" shop", " hotel"),
-        # (" office", " mall"),
-        # (" market", " library"),
-        # (" highway", " clinic"),
-        # (" classroom", " museum"),
-        # (" park", " station"),
-        # (" station", " cafe"),
-        # (" room", " theater"),
-        # (" dentist", " pharmacy"),
-        # (" hotel", " gallery"),
-        # (" kitchen", " garden"),
-        # (" wardrobe", " salon"),
-        # (" work", " basement"),
-        # (" stage", " arena"),
-        # (" pool", " stadium"),
-        # (" diner", " bistro"),
-        # (" bar", " lounge")
-    ]
-
-    corr_answers = [
-        (" park", " store"),
-        (" restaurant", " gym"),
-        (" school", " hospital"),
-        (" hotel", " shop"),
-        # (" mall", " office"),
-        # (" library", " market"),
-        # (" clinic", " highway"),
-        # (" museum", " classroom"),
-        # (" station", " park"),
-        # (" cafe", " station"),
-        # (" theater", " room"),
-        # (" pharmacy", " dentist"),
-        # (" gallery", " hotel"),
-        # (" garden", " kitchen"),
-        # (" salon", " wardrobe"),
-        # (" basement", " work"),
-        # (" arena", " stage"),
-        # (" stadium", " pool"),
-        # (" bistro", " diner"),
-        # (" lounge", " bar")
-    ]
-
-    # activation_patching(model, template, clean_tokens, corrupted_tokens, clean_answers, corr_answers)
+    template = "AOB"
+    dataset = {'clean_tokens': model.to_tokens([
+        "Jane will read it because John is getting the"
+        f]),
+              'corrupted_tokens': model.to_tokens([
+        "Jane will move it because John is getting the",
+        "Jane will sketch it because John is getting the", 
+        "Jane will break it because John is getting the"]),
+              'answers': [(' book', ' box'), (' paper', ' pencil'), (' tools', ' parts')]
+            }
+    activation_patching(model, template, dataset)
 
     # template = "AOB"
     # clean_tokens = model.to_tokens(["Jane will eat it because John is getting the", "Jane will eat it because John is getting the"])
