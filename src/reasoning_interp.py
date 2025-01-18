@@ -11,11 +11,16 @@ from torch import Tensor
 def delimiter_attention(model, prompts, delimiter=" because"):
     """
     Computes and plots the proportion of attention directed to a given delimiter token.
+    
+    This function analyzes how much attention each head in the transformer pays to delimiter
+    words like 'because' or 'so', creating a heatmap visualization of the attention patterns.
+    
     Args:
-        model: The language model with .to_tokens, .to_str_tokens, and .run_with_cache methods.
-        prompts: List of strings to be analyzed.
-        delimiter: Delimiter to focus attention on, e.g., ' because' or ' so'.
+        model: The language model
+        prompts: List of strings to be analyzed
+        delimiter: Delimiter to focus attention on, e.g., ' because' or ' so'
     """
+    print(f"\nAnalyzing attention patterns for delimiter: '{delimiter}'")
     n_layers = model.cfg.n_layers
     n_heads = model.cfg.n_heads
 
@@ -48,6 +53,17 @@ def delimiter_attention(model, prompts, delimiter=" because"):
     plt.savefig(f"../results/{model_name}/attention_map_delim_{delimiter.strip()}.png")
 
 def analyze_delimiter_attention(model):
+    """
+    Runs delimiter attention analysis on two sets of prompts:
+    1. Prompts containing 'because'
+    2. Prompts containing 'so'
+    
+    Creates heatmaps showing how different attention heads focus on these words.
+    
+    Args:
+        model: The transformer model to analyze
+    """
+    print("Starting delimiter attention analysis...")
     prompts = [
         'Alice went to the park because she wanted to find a treasure.',
         'Alice plays guitar because she enjoys strumming melodies.',
@@ -63,15 +79,21 @@ def analyze_delimiter_attention(model):
 
 def cause_effect_attention(model, prompts, delimiter, direction):
     """
-    Measures attention in a GPT-style model either from cause→effect or effect→cause.
+    Measures attention patterns between cause and effect parts of sentences.
+    
+    This function analyzes how attention flows between the cause and effect portions
+    of sentences, separated by delimiters like 'because' or 'so'. It can analyze
+    attention in both directions.
+    
     Args:
-        model:      Your model with to_tokens, to_str_tokens, run_with_cache, etc.
-        prompts:    List of strings to analyze.
-        delimiter:  Token that separates cause from effect (e.g. " because", " so").
-        direction:  "cause->effect" or "effect->cause".
+        model: model
+        prompts: List of strings to analyze
+        delimiter: Token that separates cause from effect (e.g. " because", " so")
+        direction: "cause->effect" or "effect->cause"
     Returns:
-        A (layers x heads) tensor of average attention proportions.
+        A (layers x heads) tensor of average attention proportions
     """
+    print(f"\nAnalyzing {direction} attention patterns for delimiter: '{delimiter}'")
     n_layers = model.cfg.n_layers
     n_heads = model.cfg.n_heads
     attn_prop_all_prompts = t.zeros(n_layers, n_heads)
@@ -142,6 +164,20 @@ def analyze_causal_attention(model):
                                         direction="cause->effect")
     
 def activation_patching(model, template, dataset):
+    """
+    Performs activation patching analysis on the model to understand how different
+    components contribute to the model's predictions.
+    
+    This function creates two types of visualizations:
+    1. Residual stream activation patching across layers and positions
+    2. Attention head output patching across heads and positions
+    
+    Args:
+        model: The transformer model to analyze
+        template: String identifier for the current analysis
+        dataset: Dictionary containing clean_tokens, corrupted_tokens, and answers
+    """
+    print(f"\nPerforming activation patching analysis for template: {template}")
     clean_tokens = dataset['clean_tokens']
     corrupted_tokens = dataset['corrupted_tokens']
     answers = dataset['answers']
@@ -212,25 +248,61 @@ def activation_patching(model, template, dataset):
     plt.savefig(f"../results/{model_name}/activation_patching_attn_head_out_all_pos_{template}.png")
 
 def activation_patching_analysis(model):
+    """
+    Runs activation patching experiments on various templates of prompts.
+    
+    Analyzes different types of causal relationships using templates:
+    - ALB (Action Location Because)
+    - ALS (Action Location So)
+    - ALS-2 (Alternative Action Location So)
+    - AOS (Action Object So)
+    - AOB (Action Object Because)
+    
+    Args:
+        model: The transformer model to analyze
+    """
+    print("Starting activation patching analysis across multiple templates...")
+    template = "ALB"
+    dataset = {'clean_tokens': model.to_tokens([
+        'John had to dress because he is going to the'
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'John had to run because he is going to the', 
+                  'John had to rest because he is going to the', 
+                  'John had to pack because he is going to the']),
+              'answers': [(' dance', ' park'), (' dance', ' gym'), (' dance', ' airport')]
+            }
 
-    # template = "ALB"
-    # dataset = {'clean_tokens': model.to_tokens(['John had to dress because he is going to the']),
-    #           'corrupted_tokens': model.to_tokens(['John had to run because he is going to the', 'John had to rest because he is going to the', 'John had to pack because he is going to the']),
-    #           'answers': [(' dance', ' park'), (' dance', ' gym'), (' dance', ' airport')]
-    #         }
+    activation_patching(model, template, dataset)
 
-    # activation_patching(model, template, dataset)
+    template = "ALS"
+    dataset = {'clean_tokens': model.to_tokens([
+        'Mary went to the store so she wants to'
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'Mary went to the test so she wants to', 
+                  'Mary went to the gym so she wants to', 
+                  'Mary went to the library so she wants to']),
+              'answers': [(' shop', ' write'), (' shop', ' exercise'), (' shop', ' read')]
+            }
+    activation_patching(model, template, dataset)
 
-    # template = "ALS"
-    # dataset = {'clean_tokens': model.to_tokens(['Mary went to the store so she wants to']),
-    #           'corrupted_tokens': model.to_tokens(['Mary went to the test so she wants to', 'Mary went to the gym so she wants to', 'Mary went to the library so she wants to']),
-    #           'answers': [(' shop', ' write'), (' shop', ' exercise'), (' shop', ' read')]
-    #         }
-    # activation_patching(model, template, dataset)
+    template = "ALS-2"
+    dataset = {'clean_tokens': model.to_tokens([
+        'Nadia will be at the beach so she will'
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'Nadia will be at the library so she will',
+                  'Nadia will be at the gym so she will',
+                  'Nadia will be at the hospital so she will']),
+              'answers': [(' swim', ' read'), (' swim', ' exercise'), (' swim', ' work')]
+            }
+    activation_patching(model, template, dataset)
 
     template = "AOS"
     dataset = {'clean_tokens': model.to_tokens([
-        'Sara wanted to write so Mark decided to get the']),
+        'Sara wanted to write so Mark decided to get the'
+        ]),
               'corrupted_tokens': model.to_tokens([
                   'Sara wanted to go so Mark decided to get the', 
                   'Sara wanted to sleep so Mark decided to get the', 
@@ -241,294 +313,25 @@ def activation_patching_analysis(model):
 
     template = "AOB"
     dataset = {'clean_tokens': model.to_tokens([
-        "Jane will read it because John is getting the"
-        f]),
+        'Jane will read it because John is getting the'
+        ]),
               'corrupted_tokens': model.to_tokens([
-        "Jane will move it because John is getting the",
-        "Jane will sketch it because John is getting the", 
-        "Jane will break it because John is getting the"]),
-              'answers': [(' book', ' box'), (' paper', ' pencil'), (' tools', ' parts')]
+                  'Jane will move it because John is getting the',
+                  'Jane will sketch it because John is getting the', 
+                  'Jane will play it because John is getting the']),
+              'answers': [(' book', ' box'), (' book', ' pencil'), (' book', ' guitar')]
             }
+    
     activation_patching(model, template, dataset)
 
-    # template = "AOB"
-    # clean_tokens = model.to_tokens(["Jane will eat it because John is getting the", "Jane will eat it because John is getting the"])
-    # corrupted_tokens = model.to_tokens(["Jane will sing it because John is getting the", "Jane will sing it because John is getting the"])
-
-    # clean_answers = [(" sandwich", " music")]
-    # corr_answers = [(" sandwich", " music")]
-    # activation_patching(model, template, clean_tokens, corrupted_tokens, clean_answers, corr_answers)
-
-    template = "AOB"
-    clean_tokens = model.to_tokens([
-        "Jane will read it because John is getting the.",
-        "Jane will write it because John is getting the.",
-        "Jane will fix it because John is getting the.",
-        # "Jane will return it because John is getting the.",
-        # "Jane will paint it because John is getting the.",
-        # "Jane will pack it because John is getting the.",
-        # "Jane will clean it because John is getting the.",
-        # "Jane will assemble it because John is getting the.",
-        # "Jane will buy it because John is getting the.",
-        # "Jane will sell it because John is getting the.",
-        # "Jane will cook it because John is getting the.",
-        # "Jane will open it because John is getting the.",
-        # "Jane will wrap it because John is getting the.",
-        # "Jane will test it because John is getting the.",
-        # "Jane will charge it because John is getting the.",
-        # "Jane will debug it because John is getting the.",
-        # "Jane will lock it because John is getting the.",
-        # "Jane will unlock it because John is getting the.",
-        # "Jane will decorate it because John is getting the.",
-        # "Jane will scan it because John is getting the."
-    ])
-
-    corrupted_tokens = model.to_tokens([
-        "Jane will move it because John is getting the.",
-        "Jane will sketch it because John is getting the.",
-        "Jane will break it because John is getting the.",
-        # "Jane will borrow it because John is getting the.",
-        # "Jane will polish it because John is getting the.",
-        # "Jane will unpack it because John is getting the.",
-        # "Jane will dirty it because John is getting the.",
-        # "Jane will disassemble it because John is getting the.",
-        # "Jane will steal it because John is getting the.",
-        # "Jane will trade it because John is getting the.",
-        # "Jane will burn it because John is getting the.",
-        # "Jane will close it because John is getting the.",
-        # "Jane will unwrap it because John is getting the.",
-        # "Jane will ignore it because John is getting the.",
-        # "Jane will discharge it because John is getting the.",
-        # "Jane will confuse it because John is getting the.",
-        # "Jane will leave it because John is getting the.",
-        # "Jane will seal it because John is getting the.",
-        # "Jane will remove it because John is getting the.",
-        # "Jane will copy it because John is getting the."
-    ])
-
-    clean_answers = [
-        (" book", " tool"),
-        (" pen", " paper"),
-        (" device", " part"),
-        # (" item", " gift"),
-        # (" canvas", " brush"),
-        # (" suitcase", " backpack"),
-        # (" table", " cloth"),
-        # (" furniture", " screws"),
-        # (" groceries", " cart"),
-        # (" car", " money"),
-        # (" meal", " ingredients"),
-        # (" envelope", " letter"),
-        # (" box", " ribbon"),
-        # (" code", " laptop"),
-        # (" phone", " charger"),
-        # (" program", " computer"),
-        # (" door", " key"),
-        # (" safe", " lock"),
-        # (" house", " decorations"),
-        # (" document", " printer")
-    ]
-
-    corr_answers = [
-        (" tool", " book"),
-        (" paper", " pen"),
-        (" part", " device"),
-        # (" gift", " item"),
-        # (" brush", " canvas"),
-        # (" backpack", " suitcase"),
-        # (" cloth", " table"),
-        # (" screws", " furniture"),
-        # (" cart", " groceries"),
-        # (" money", " car"),
-        # (" ingredients", " meal"),
-        # (" letter", " envelope"),
-        # (" ribbon", " box"),
-        # (" laptop", " code"),
-        # (" charger", " phone"),
-        # (" computer", " program"),
-        # (" key", " door"),
-        # (" lock", " safe"),
-        # (" decorations", " house"),
-        # (" printer", " document")
-        ]
-    
-    activation_patching(model, template, clean_tokens, corrupted_tokens, clean_answers, corr_answers)
-
-
-    template = "ALS"
-    clean_tokens = model.to_tokens([
-        "Mary went to the store so she wants to shop.",
-        "Mary went to the gym so she wants to exercise.",
-        "Mary went to the library so she wants to study.",
-        # "Mary went to the park so she wants to relax.",
-        # "Mary went to the office so she wants to work.",
-        # "Mary went to the beach so she wants to swim.",
-        # "Mary went to the kitchen so she wants to cook.",
-        # "Mary went to the garden so she wants to plant.",
-        # "Mary went to the mall so she wants to browse.",
-        # "Mary went to the airport so she wants to travel.",
-        # "Mary went to the cinema so she wants to watch."
-    ])
-
-    corrupted_tokens = model.to_tokens([
-        "Mary went to the store so she wants to run.",
-        "Mary went to the gym so she wants to rest.",
-        "Mary went to the library so she wants to chat.",
-        # "Mary went to the park so she wants to work.",
-        # "Mary went to the office so she wants to cook.",
-        # "Mary went to the beach so she wants to read.",
-        # "Mary went to the kitchen so she wants to clean.",
-        # "Mary went to the garden so she wants to play.",
-        # "Mary went to the mall so she wants to exercise.",
-        # "Mary went to the airport so she wants to relax.",
-        # "Mary went to the cinema so she wants to eat."
-    ])
-
-    clean_answers = [
-        (" store", " shop"),
-        (" gym", " exercise"),
-        (" library", " study"),
-        # (" park", " relax"),
-        # (" office", " work"),
-        # (" beach", " swim"),
-        # (" kitchen", " cook"),
-        # (" garden", " plant"),
-        # (" mall", " browse"),
-        # (" airport", " travel"),
-        # (" cinema", " watch")
-    ]
-
-    corr_answers = [
-        (" store", " run"),
-        (" gym", " rest"),
-        (" library", " chat"),
-        # (" park", " work"),
-        # (" office", " cook"),
-        # (" beach", " read"),
-        # (" kitchen", " clean"),
-        # (" garden", " play"),
-        # (" mall", " exercise"),
-        # (" airport", " relax"),
-        # (" cinema", " eat")
-    ]
-
-    activation_patching(model, template, clean_tokens, corrupted_tokens, clean_answers, corr_answers)
-
-    template = "ALS-2"
-    clean_tokens = model.to_tokens([
-        "Nadia will be at the park so she will jog.",
-        "Nadia will be at the kitchen so she will cook.",
-        "Nadia will be at the office so she will work.",
-        # "Nadia will be at the library so she will read.",
-        # "Nadia will be at the gym so she will exercise.",
-        # "Nadia will be at the beach so she will swim.",
-        # "Nadia will be at the store so she will shop.",
-        # "Nadia will be at the airport so she will travel.",
-        # "Nadia will be at the garden so she will plant.",
-        # "Nadia will be at the theater so she will perform.",
-        # "Nadia will be at the stadium so she will cheer."
-    ])
-
-    corrupted_tokens = model.to_tokens([
-        "Nadia will be at the park so she will nap.",
-        "Nadia will be at the kitchen so she will clean.",
-        "Nadia will be at the office so she will relax.",
-        # "Nadia will be at the library so she will nap.",
-        # "Nadia will be at the gym so she will stretch.",
-        # "Nadia will be at the beach so she will sunbathe.",
-        # "Nadia will be at the store so she will browse.",
-        # "Nadia will be at the airport so she will wait.",
-        # "Nadia will be at the garden so she will rest.",
-        # "Nadia will be at the theater so she will watch.",
-        # "Nadia will be at the stadium so she will play."
-    ])
-
-    clean_answers = [
-        (" park", " jog"),
-        (" kitchen", " cook"),
-        (" office", " work"),
-        # (" library", " read"),
-        # (" gym", " exercise"),
-        # (" beach", " swim"),
-        # (" store", " shop"),
-        # (" airport", " travel"),
-        # (" garden", " plant"),
-        # (" theater", " perform"),
-        # (" stadium", " cheer")
-    ]
-
-    corr_answers = [
-        (" park", " nap"),
-        (" kitchen", " clean"),
-        (" office", " relax"),
-        # (" library", " nap"),
-        # (" gym", " stretch"),
-        # (" beach", " sunbathe"),
-        # (" store", " browse"),
-        # (" airport", " wait"),
-        # (" garden", " rest"),
-        # (" theater", " watch"),
-        # (" stadium", " play")
-    ]
-
-    activation_patching(model, template, clean_tokens, corrupted_tokens, clean_answers, corr_answers)
-
-    template = "AOS"
-    clean_tokens = model.to_tokens([
-        "Sarah wanted to read so Mark decided to get the book.",
-        "Sarah wanted to write so Mark decided to get the pen.",
-        "Sarah wanted to paint so Mark decided to get the brush.",
-        # "Sarah wanted to cook so Mark decided to get the pan.",
-        # "Sarah wanted to fix so Mark decided to get the tool.",
-        # "Sarah wanted to swim so Mark decided to get the swimsuit.",
-        # "Sarah wanted to clean so Mark decided to get the mop.",
-        # "Sarah wanted to plant so Mark decided to get the seeds.",
-        # "Sarah wanted to travel so Mark decided to get the ticket.",
-        # "Sarah wanted to study so Mark decided to get the textbook."
-    ])
-
-    corrupted_tokens = model.to_tokens([
-        "Sarah wanted to read so Mark decided to get the lamp.",
-        "Sarah wanted to write so Mark decided to get the paper.",
-        "Sarah wanted to paint so Mark decided to get the canvas.",
-        # "Sarah wanted to cook so Mark decided to get the knife.",
-        # "Sarah wanted to fix so Mark decided to get the nail.",
-        # "Sarah wanted to swim so Mark decided to get the goggles.",
-        # "Sarah wanted to clean so Mark decided to get the cloth.",
-        # "Sarah wanted to plant so Mark decided to get the shovel.",
-        # "Sarah wanted to travel so Mark decided to get the bag.",
-        # "Sarah wanted to study so Mark decided to get the lamp."
-    ])
-
-    clean_answers = [
-        (" read", " book"),
-        (" write", " pen"),
-        (" paint", " brush"),
-        # (" cook", " pan"),
-        # (" fix", " tool"),
-        # (" swim", " swimsuit"),
-        # (" clean", " mop"),
-        # (" plant", " seeds"),
-        # (" travel", " ticket"),
-        # (" study", " textbook")
-    ]
-
-    corr_answers = [
-        (" read", " lamp"),
-        (" write", " paper"),
-        (" paint", " canvas"),
-        # (" cook", " knife"),
-        # (" fix", " nail"),
-        # (" swim", " goggles"),
-        # (" clean", " cloth"),
-        # (" plant", " shovel"),
-        # (" travel", " bag"),
-        # (" study", " lamp")
-    ]
-
-    activation_patching(model, template, clean_tokens, corrupted_tokens, clean_answers, corr_answers)
-
 def main():
+    """
+    Main entry point for the reasoning interpretation analysis.
+    
+    Sets up the model and directory structure, then runs various analyses
+    to understand how the model processes causal relationships.
+    """
+    print(f"Initializing analysis with model: {model_name}")
     global model_name
     model_name = "gpt2-small"
     if not os.path.exists(f"../results/{model_name}"):
