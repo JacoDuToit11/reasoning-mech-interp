@@ -182,7 +182,7 @@ def logits_to_ave_logit_diff(
     answer_logit_diff = correct_logits - incorrect_logits
     return answer_logit_diff if per_prompt else answer_logit_diff.mean()
 
-def activation_patching(model, template, dataset):
+def activation_patching(model, category, template_title, dataset):
     """
     Performs activation patching analysis on the model to understand how different
     components contribute to the model's predictions.
@@ -193,11 +193,15 @@ def activation_patching(model, template, dataset):
     
     Args:
         model: The transformer model to analyze
-        template: String identifier for the current analysis
+        category: String identifier for the current analysis
+        template_title: String identifier for the current template
         dataset: Dictionary containing clean_tokens, corrupted_tokens, and answers
     """
 
-    print(f"\nPerforming activation patching analysis for template: {template}")
+    if not os.path.exists(f"../results/{model_name}/{category}"):
+        os.makedirs(f"../results/{model_name}/{category}")
+
+    print(f"\nPerforming activation patching analysis for template: {template_title}")
     clean_tokens = dataset['clean_tokens']
     corrupted_tokens = dataset['corrupted_tokens']
     answers = dataset['answers']
@@ -250,7 +254,7 @@ def activation_patching(model, template, dataset):
     if 'labels' in locals() and labels is not None:
         plt.xticks(ticks=np.arange(len(labels)), labels=labels, rotation=45)
 
-    plt.savefig(f"../results/{model_name}/activation_patching_per_block_{template}.png")
+    plt.savefig(f"../results/{model_name}/{category}/activation_patching_per_block_{template_title}.png")
 
     act_patch_attn_head_out_all_pos = patching.get_act_patch_attn_head_out_all_pos(
         model,
@@ -265,17 +269,17 @@ def activation_patching(model, template, dataset):
     plt.xlabel("Head")
     plt.ylabel("Position")
     plt.title("Attention Head Outputs Heatmap")
-    plt.savefig(f"../results/{model_name}/activation_patching_attn_head_out_all_pos_{template}.png")
+    plt.savefig(f"../results/{model_name}/{category}/activation_patching_attn_head_out_all_pos_{template_title}.png")
 
 def create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template):
     dataset = {
         'clean_tokens': model.to_tokens([
-            base_template.format(action)
-            for action, _ in clean_pairs
+            base_template.format(token)
+            for token, _ in clean_pairs
         ]),
         'corrupted_tokens': model.to_tokens([
-            base_template.format(action)
-            for action, _ in corrupted_pairs
+            base_template.format(token)
+            for token, _ in corrupted_pairs
         ]),
         'answers': [
             (f" {clean[1]}", f" {corrupt[1]}")
@@ -300,7 +304,9 @@ def activation_patching_semantic_analysis(model):
         model: The transformer model to analyze
     """
     print("Starting activation patching analysis across semantic templates...")
-    # Template: "John had to {action} because he is going to the {location}"
+    category = "semantic"
+    
+    # Template: "John had to [ACTION] because he is going to the [LOCATION]"
     template_title = "ALB"
     base_template = "John had to {} because he is going to the"
     
@@ -314,68 +320,72 @@ def activation_patching_semantic_analysis(model):
         ("rest", "gym"), 
         ("pack", "airport")
     ]
-
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, template_title, dataset)
+    activation_patching(model, category, template_title, dataset)
 
-    exit()
+    # Template: "Jane will [ACTION] it because John is getting the [OBJECT]"
+    template_title = "AOB"
+    base_template = "Jane will {} it because John is getting the"
+    clean_pairs = [
+        ("read", "book"),
+        ("eat", "food"),
+        ("throw", "ball")
+    ]
+    corrupted_pairs = [
+        ("move", "box"),
+        ("sketch", "pencil"),
+        ("play", "guitar")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
 
-    template = "ALS"
-    dataset = {'clean_tokens': model.to_tokens([
-        'Mary went to the store so she wants to',
-        'Mary went to the church so she wants to',
-        'Mary went to the airport so she wants to',
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'Mary went to the test so she wants to', 
-                  'Mary went to the gym so she wants to', 
-                  'Mary went to the library so she wants to']),
-              'answers': [(' shop', ' write'), (' pray', ' exercise'), (' fly', ' read')]
-            }
-    activation_patching(model, template, dataset)
+    # Template: "Mary went to the [LOCATION] so she wants to [ACTION]"
+    template_title = "ALS"
+    base_template = "Mary went to the {} so she wants to"
+    clean_pairs = [
+        ("store", "shop"),
+        ("church", "pray"),
+        ("airport", "fly")
+    ]
+    corrupted_pairs = [
+        ("test", "write"),
+        ("gym", "exercise"),
+        ("library", "read")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
 
-    template = "ALS-2"
-    dataset = {'clean_tokens': model.to_tokens([
-        'Nadia will be at the beach so she will',
-        'Nadia will be at the church so she will',
-        'Nadia will be at the airport so she will',
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'Nadia will be at the library so she will',
-                  'Nadia will be at the gym so she will',
-                  'Nadia will be at the hospital so she will']),
-              'answers': [(' swim', ' read'), (' pray', ' exercise'), (' fly', ' work')]
-            }
-    activation_patching(model, template, dataset)
+    # Template: "Nadia will be at the [LOCATION] so she will [ACTION]"
+    template_title = "ALS-2"
+    base_template = "Nadia will be at the {} so she will"
+    clean_pairs = [
+        ("beach", "swim"),
+        ("church", "pray"),
+        ("airport", "fly")
+    ]
+    corrupted_pairs = [
+        ("library", "read"),
+        ("gym", "exercise"),
+        ("hospital", "work")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
 
-    template = "AOS"
-    dataset = {'clean_tokens': model.to_tokens([
-        'Sara wanted to write so Mark decided to get the',
-        'Sara wanted to pray so Mark decided to get the',
-        'Sara wanted to study so Mark decided to get the',
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'Sara wanted to go so Mark decided to get the', 
-                  'Sara wanted to sleep so Mark decided to get the', 
-                  'Sara wanted to play so Mark decided to get the']),
-              'answers': [(' book', ' car'), (' bible', ' room'), (' book', ' guitar')]
-            }
-    activation_patching(model, template, dataset)
-
-    template = "AOB"
-    dataset = {'clean_tokens': model.to_tokens([
-        'Jane will read it because John is getting the',
-        'Jane will eat it because John is getting the',
-        'Jane will throw it because John is getting the',
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'Jane will move it because John is getting the',
-                  'Jane will sketch it because John is getting the', 
-                  'Jane will play it because John is getting the']),
-              'answers': [(' book', ' box'), (' food', ' pencil'), (' ball', ' guitar')]
-            }
-    
-    activation_patching(model, template, dataset)
+    # Template: "Sara wanted to [ACTION] so Mark decided to get the [OBJECT]"
+    template_title = "AOS"
+    base_template = "Sara wanted to {} so Mark decided to get the"
+    clean_pairs = [
+        ("write", "book"),
+        ("pray", "bible"),
+        ("study", "book")
+    ]
+    corrupted_pairs = [
+        ("go", "car"),
+        ("sleep", "room"),
+        ("play", "guitar")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
 
 def activation_patching_mathematical_analysis(model):
     """
@@ -392,76 +402,166 @@ def activation_patching_mathematical_analysis(model):
         model: The transformer model to analyze
     """
     print("Starting activation patching analysis across mathematical templates...")
+    category = "mathematical"
+    # Template: "John had [X] apples but now has 8 because Mary gave him"
+    template_title = "MAB"
+    base_template = "John had {} apples but now has 8 because Mary gave him"
+    clean_pairs = [
+        ("5", "3"),
+        ("3", "4"),
+        ("12", "7")
+    ]
+    corrupted_pairs = [
+        ("3", "5"),
+        ("6", "1"),
+        ("4", "15")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
 
-    template = "MAB"
-    dataset = {'clean_tokens': model.to_tokens([
-        'John had 5 apples but now has 8 because Mary gave him',
-        'John had 3 apples but now has 7 because Mary gave him',
-        'John had 12 apples but now has 19 because Mary gave him',
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'John had 3 apples but now has 8 because Mary gave him',
-                  'John had 6 apples but now has 7 because Mary gave him',
-                  'John had 4 apples but now has 19 because Mary gave him']),
-              'answers': [(' 3', ' 5'), (' 4', ' 1'), (' 7', ' 15')]
-            }
-    activation_patching(model, template, dataset)
+    # Template: "Jane needs [X] apples because she already has 6 and wants a total of"
+    template_title = "MAB-2"
+    base_template = "Jane needs {} apples because she already has 6 and wants a total of"
+    clean_pairs = [
+        ("4", "10"),
+        ("10", "31"),
+        ("110", "122")
+    ]
+    corrupted_pairs = [
+        ("3", "9"),
+        ("12", "33"),
+        ("57", "69")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
 
-    template = "MAB-2"
-    dataset = {'clean_tokens': model.to_tokens([
-        'Jane needs 4 apples because she already has 6 and wants a total of',
-        'Jane needs 10 apples because she already has 21 and wants a total of',
-        'Jane needs 110 apples because she already has 12 and wants a total of'
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'Jane needs 3 apples because she already has 6 and wants a total of',
-                  'Jane needs 12 apples because she already has 21 and wants a total of',
-                  'Jane needs 57 apples because she already has 12 and wants a total of']),
-              'answers': [(' 10', ' 9'), (' 31', ' 33'), (' 122', ' 69')]
-            }
-    activation_patching(model, template, dataset)
+    # Template: "Mary got [X] oranges so now she has 8 after starting with"
+    template_title = "MPS"
+    base_template = "Mary got {} oranges so now she has 8 after starting with"
+    clean_pairs = [
+        ("3", "5"),
+        ("12", "7"),
+        ("3", "18")
+    ]
+    corrupted_pairs = [
+        ("2", "6"),
+        ("6", "13"),
+        ("4", "17")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
 
-    template = "MPS"
-    dataset = {'clean_tokens': model.to_tokens([
-        'Mary got 3 oranges so now she has 8 after starting with',
-        'Mary got 12 oranges so now she has 19 after starting with',
-        'Mary got 3 oranges so now she has 21 after starting with'
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'Mary got 2 oranges so now she has 8 after starting with',
-                  'Mary got 6 oranges so now she has 19 after starting with',
-                  'Mary got 4 oranges so now she has 21 after starting with']),
-              'answers': [(' 5', ' 6'), (' 7', ' 13'), (' 18', ' 17')]
-            }
-    activation_patching(model, template, dataset)
+    # Template: "Nadia shared [X] bananas so she only has 2 after starting with"
+    template_title = "MPS-2"
+    base_template = "Nadia shared {} bananas so she only has 2 after starting with"
+    clean_pairs = [
+        ("3", "5"),
+        ("4", "7"),
+        ("5", "9")
+    ]
+    corrupted_pairs = [
+        ("2", "4"),
+        ("6", "9"),
+        ("3", "7")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
 
-    template = "MPS-2"
-    dataset = {'clean_tokens': model.to_tokens([
-        'Nadia shared 3 bananas so she only has 2 after starting with',
-        'Nadia shared 4 bananas so she only has 3 after starting with',
-        'Nadia shared 5 bananas so she only has 4 after starting with'
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'Nadia shared 2 bananas so she only has 2 after starting with',
-                  'Nadia shared 6 bananas so she only has 3 after starting with',
-                  'Nadia shared 3 bananas so she only has 4 after starting with']),
-              'answers': [(' 5', ' 4'), (' 7', ' 9'), (' 9', ' 7')]
-            }
-    activation_patching(model, template, dataset)
+    # Template: "Sarah needed [X] pencils so she could complete her set of 10 after starting with"
+    template_title = "MRS"
+    base_template = "Sarah needed {} pencils so she could complete her set of 10 after starting with"
+    clean_pairs = [
+        ("3", "7"),
+        ("5", "7"),
+        ("4", "11")
+    ]
+    corrupted_pairs = [
+        ("4", "6"),
+        ("3", "9"),
+        ("6", "9")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
 
-    template = "MRS"
-    dataset = {'clean_tokens': model.to_tokens([
-        'Sarah needed 3 pencils so she could complete her set of 10 after starting with',
-        'Sarah needed 5 pencils so she could complete her set of 12 after starting with',
-        'Sarah needed 4 pencils so she could complete her set of 15 after starting with'
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'Sarah needed 4 pencils so she could complete her set of 10 after starting with',
-                  'Sarah needed 3 pencils so she could complete her set of 12 after starting with',
-                  'Sarah needed 6 pencils so she could complete her set of 15 after starting with']),
-              'answers': [(' 7', ' 6'), (' 7', ' 9'), (' 11', ' 9')]
-            }
-    activation_patching(model, template, dataset)
+def activation_patching_arithmetic_analysis(model):
+    """
+    Runs activation patching experiments on basic arithmetic word problems.
+    
+    Analyzes different types of arithmetic operations using templates:
+    - ADD (Addition word problems with constant addend)
+    - SUB (Subtraction word problems with constant subtrahend)
+    - MUL (Multiplication word problems with constant multiplier)
+    - DIV (Division word problems with constant divisor)
+    
+    Args:
+        model: The transformer model to analyze
+    """
+    print("Starting activation patching analysis across arithmetic templates...")
+    category = "arithmetic"
+
+    # Template: "If Tom has [X] apples and gets 3 more, he will have"
+    template_title = "ADD"
+    base_template = "If Tom has {} apples and gets 3 more, he will have"
+    clean_pairs = [
+        ("2", "5"),
+        ("4", "7"),
+        ("7", "10")
+    ]
+    corrupted_pairs = [
+        ("5", "8"),
+        ("6", "9"),
+        ("8", "11")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
+
+    # Template: "If Sarah has [X] candies and gives away 4, she will have"
+    template_title = "SUB"
+    base_template = "If Sarah has {} candies and gives away 4, she will have"
+    clean_pairs = [
+        ("9", "5"),
+        ("12", "8"),
+        ("15", "11")
+    ]
+    corrupted_pairs = [
+        ("10", "6"),
+        ("14", "10"),
+        ("16", "12")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
+
+    # Template: "If each box has 5 chocolates and there are [X] boxes, there are"
+    template_title = "MUL"
+    base_template = "If each box has 5 chocolates and there are {} boxes, there are"
+    clean_pairs = [
+        ("3", "15"),
+        ("4", "20"),
+        ("6", "30")
+    ]
+    corrupted_pairs = [
+        ("2", "10"),
+        ("5", "25"),
+        ("7", "35")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
+
+    # Template: "If [X] cookies are shared equally among 4 friends, each friend gets"
+    template_title = "DIV"
+    base_template = "If {} cookies are shared equally among 4 friends, each friend gets"
+    clean_pairs = [
+        ("12", "3"),
+        ("16", "4"),
+        ("20", "5")
+    ]
+    corrupted_pairs = [
+        ("8", "2"),
+        ("24", "6"),
+        ("28", "7")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, category, template_title, dataset)
 
 def activation_patching_emotional_analysis(model):
     """
@@ -478,10 +578,11 @@ def activation_patching_emotional_analysis(model):
         model: The transformer model to analyze
     """
     print("Starting activation patching analysis across emotional templates...")
+    category = "emotional"
 
-    # Template: "Tom {emotion} because Pete {action}"
-    template = "EAB"
-    base_template = "Tom {} because Pete was {}"
+    # Template: "Tom [EMOTION] because Pete [ACTION]"
+    template_title = "EAB"
+    base_template = "Tom {} because Pete {}"
 
     clean_emotions = [
         ("laughed", "joked"),
@@ -681,10 +782,11 @@ def main():
     model: HookedTransformer = HookedTransformer.from_pretrained(model_name)
     # analyze_delimiter_attention(model)
     # analyze_causal_attention(model)
-    activation_patching_semantic_analysis(model)
+    # activation_patching_semantic_analysis(model)
     # activation_patching_mathematical_analysis(model)
-    # activation_patching_emotional_analysis(model)
+    activation_patching_emotional_analysis(model)
     # activation_patching_physical_analysis(model)
+    # activation_patching_arithmetic_analysis(model)
 
 
 if __name__ == "__main__":
