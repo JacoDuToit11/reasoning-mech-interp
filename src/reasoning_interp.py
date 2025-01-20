@@ -163,6 +163,25 @@ def analyze_causal_attention(model):
                                         delimiter=" so",
                                         direction="cause->effect")
     
+def logits_to_ave_logit_diff(
+    logits: Float[Tensor, "batch seq d_vocab"],
+    answer_tokens: Float[Tensor, "batch 2"],
+    per_prompt: bool = False,
+) -> Float[Tensor, "*batch"]:
+    """
+    Returns logit difference between the correct and incorrect answer.
+
+    If per_prompt=True, return the array of differences rather than the average.
+    """
+    # Only the final logits are relevant for the answer
+    final_logits: Float[Tensor, "batch d_vocab"] = logits[:, -1, :]
+    # Get the logits corresponding to the indirect object / subject tokens respectively
+    answer_logits: Float[Tensor, "batch 2"] = final_logits.gather(dim=-1, index=answer_tokens)
+    # Find logit difference
+    correct_logits, incorrect_logits = answer_logits.unbind(dim=-1)
+    answer_logit_diff = correct_logits - incorrect_logits
+    return answer_logit_diff if per_prompt else answer_logit_diff.mean()
+
 def activation_patching(model, template, dataset):
     """
     Performs activation patching analysis on the model to understand how different
@@ -177,6 +196,7 @@ def activation_patching(model, template, dataset):
         template: String identifier for the current analysis
         dataset: Dictionary containing clean_tokens, corrupted_tokens, and answers
     """
+
     print(f"\nPerforming activation patching analysis for template: {template}")
     clean_tokens = dataset['clean_tokens']
     corrupted_tokens = dataset['corrupted_tokens']
@@ -186,27 +206,27 @@ def activation_patching(model, template, dataset):
         model.to_tokens(answers, prepend_bos=False).T for answers in answers
     ])
 
-    print(answer_tokens)
-
     clean_logits, clean_cache = model.run_with_cache(clean_tokens)
+    corrupted_logits, corrupted_cache = model.run_with_cache(corrupted_tokens)
+    clean_logit_diff = logits_to_ave_logit_diff(clean_logits, answer_tokens)
+    print(f"Clean logit diff: {clean_logit_diff:.4f}")
 
+    corrupted_logit_diff = logits_to_ave_logit_diff(corrupted_logits, answer_tokens)
+    print(f"Corrupted logit diff: {corrupted_logit_diff:.4f}")
+    
     def logit_diff_metric(
         logits: Float[Tensor, "batch seq d_vocab"],
-        answer_tokens = answer_tokens,
-        per_prompt: bool = False
-        ) -> Float[Tensor, "*batch"]:
-        '''
-        Returns logit difference between the correct and incorrect answer.
+        answer_tokens: Float[Tensor, "batch 2"] = answer_tokens,
+        corrupted_logit_diff: float = corrupted_logit_diff,
+        clean_logit_diff: float = clean_logit_diff,
+    ) -> Float[Tensor, ""]:
+        """
+        Linear function of logit diff, calibrated so that it equals 0 when performance is same as on corrupted input, and 1
+        when performance is same as on clean input.
+        """
+        patched_logit_diff = logits_to_ave_logit_diff(logits, answer_tokens)
+        return (patched_logit_diff - corrupted_logit_diff) / (clean_logit_diff - corrupted_logit_diff)
 
-        If per_prompt=True, return the array of differences rather than the average.
-        '''
-
-        final_logits: Float[Tensor, "batch d_vocab"] = logits[:, -1, :]
-        answer_logits: Float[Tensor, "batch 2"] = final_logits.gather(dim=-1, index=answer_tokens)
-        correct_logits, incorrect_logits = answer_logits.unbind(dim=-1)
-        answer_logit_diff = correct_logits - incorrect_logits
-        return answer_logit_diff if per_prompt else answer_logit_diff.mean()
-    
     act_patch_resid_pre = patching.get_act_patch_resid_pre(
         model=model,
         corrupted_tokens=corrupted_tokens,
@@ -247,7 +267,25 @@ def activation_patching(model, template, dataset):
     plt.title("Attention Head Outputs Heatmap")
     plt.savefig(f"../results/{model_name}/activation_patching_attn_head_out_all_pos_{template}.png")
 
-def activation_patching_analysis(model):
+def create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template):
+    dataset = {
+        'clean_tokens': model.to_tokens([
+            base_template.format(action)
+            for action, _ in clean_pairs
+        ]),
+        'corrupted_tokens': model.to_tokens([
+            base_template.format(action)
+            for action, _ in corrupted_pairs
+        ]),
+        'answers': [
+            (f" {clean[1]}", f" {corrupt[1]}")
+            for clean, corrupt in zip(clean_pairs, corrupted_pairs)
+        ]
+    }
+
+    return dataset
+
+def activation_patching_semantic_analysis(model):
     """
     Runs activation patching experiments on various templates of prompts.
     
@@ -261,67 +299,370 @@ def activation_patching_analysis(model):
     Args:
         model: The transformer model to analyze
     """
-    print("Starting activation patching analysis across multiple templates...")
-    template = "ALB"
-    dataset = {'clean_tokens': model.to_tokens([
-        'John had to dress because he is going to the'
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'John had to run because he is going to the', 
-                  'John had to rest because he is going to the', 
-                  'John had to pack because he is going to the']),
-              'answers': [(' dance', ' park'), (' dance', ' gym'), (' dance', ' airport')]
-            }
+    print("Starting activation patching analysis across semantic templates...")
+    # Template: "John had to {action} because he is going to the {location}"
+    template_title = "ALB"
+    base_template = "John had to {} because he is going to the"
+    
+    clean_pairs = [
+        ("dress", "dance"),
+        ("pray", "church"),
+        ("study", "test")
+    ]
+    corrupted_pairs = [
+        ("run", "park"),
+        ("rest", "gym"), 
+        ("pack", "airport")
+    ]
 
-    activation_patching(model, template, dataset)
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    activation_patching(model, template_title, dataset)
+
+    exit()
 
     template = "ALS"
     dataset = {'clean_tokens': model.to_tokens([
-        'Mary went to the store so she wants to'
+        'Mary went to the store so she wants to',
+        'Mary went to the church so she wants to',
+        'Mary went to the airport so she wants to',
         ]),
               'corrupted_tokens': model.to_tokens([
                   'Mary went to the test so she wants to', 
                   'Mary went to the gym so she wants to', 
                   'Mary went to the library so she wants to']),
-              'answers': [(' shop', ' write'), (' shop', ' exercise'), (' shop', ' read')]
+              'answers': [(' shop', ' write'), (' pray', ' exercise'), (' fly', ' read')]
             }
     activation_patching(model, template, dataset)
 
     template = "ALS-2"
     dataset = {'clean_tokens': model.to_tokens([
-        'Nadia will be at the beach so she will'
+        'Nadia will be at the beach so she will',
+        'Nadia will be at the church so she will',
+        'Nadia will be at the airport so she will',
         ]),
               'corrupted_tokens': model.to_tokens([
                   'Nadia will be at the library so she will',
                   'Nadia will be at the gym so she will',
                   'Nadia will be at the hospital so she will']),
-              'answers': [(' swim', ' read'), (' swim', ' exercise'), (' swim', ' work')]
+              'answers': [(' swim', ' read'), (' pray', ' exercise'), (' fly', ' work')]
             }
     activation_patching(model, template, dataset)
 
     template = "AOS"
     dataset = {'clean_tokens': model.to_tokens([
-        'Sara wanted to write so Mark decided to get the'
+        'Sara wanted to write so Mark decided to get the',
+        'Sara wanted to pray so Mark decided to get the',
+        'Sara wanted to study so Mark decided to get the',
         ]),
               'corrupted_tokens': model.to_tokens([
                   'Sara wanted to go so Mark decided to get the', 
                   'Sara wanted to sleep so Mark decided to get the', 
                   'Sara wanted to play so Mark decided to get the']),
-              'answers': [(' book', ' car'), (' book', ' room'), (' book', ' ball')]
+              'answers': [(' book', ' car'), (' bible', ' room'), (' book', ' guitar')]
             }
     activation_patching(model, template, dataset)
 
     template = "AOB"
     dataset = {'clean_tokens': model.to_tokens([
-        'Jane will read it because John is getting the'
+        'Jane will read it because John is getting the',
+        'Jane will eat it because John is getting the',
+        'Jane will throw it because John is getting the',
         ]),
               'corrupted_tokens': model.to_tokens([
                   'Jane will move it because John is getting the',
                   'Jane will sketch it because John is getting the', 
                   'Jane will play it because John is getting the']),
-              'answers': [(' book', ' box'), (' book', ' pencil'), (' book', ' guitar')]
+              'answers': [(' book', ' box'), (' food', ' pencil'), (' ball', ' guitar')]
             }
     
+    activation_patching(model, template, dataset)
+
+def activation_patching_mathematical_analysis(model):
+    """
+    Runs activation patching experiments on mathematical reasoning templates.
+    
+    Analyzes different types of mathematical relationships using templates:
+    - MAB (Mathematical Action Because)
+    - MAB-2 (Alternative Mathematical Action Because)
+    - MPS (Mathematical Progressive So)
+    - MPS-2 (Alternative Mathematical Progressive So)
+    - MRS (Mathematical Requirement So)
+    
+    Args:
+        model: The transformer model to analyze
+    """
+    print("Starting activation patching analysis across mathematical templates...")
+
+    template = "MAB"
+    dataset = {'clean_tokens': model.to_tokens([
+        'John had 5 apples but now has 8 because Mary gave him',
+        'John had 3 apples but now has 7 because Mary gave him',
+        'John had 12 apples but now has 19 because Mary gave him',
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'John had 3 apples but now has 8 because Mary gave him',
+                  'John had 6 apples but now has 7 because Mary gave him',
+                  'John had 4 apples but now has 19 because Mary gave him']),
+              'answers': [(' 3', ' 5'), (' 4', ' 1'), (' 7', ' 15')]
+            }
+    activation_patching(model, template, dataset)
+
+    template = "MAB-2"
+    dataset = {'clean_tokens': model.to_tokens([
+        'Jane needs 4 apples because she already has 6 and wants a total of',
+        'Jane needs 10 apples because she already has 21 and wants a total of',
+        'Jane needs 110 apples because she already has 12 and wants a total of'
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'Jane needs 3 apples because she already has 6 and wants a total of',
+                  'Jane needs 12 apples because she already has 21 and wants a total of',
+                  'Jane needs 57 apples because she already has 12 and wants a total of']),
+              'answers': [(' 10', ' 9'), (' 31', ' 33'), (' 122', ' 69')]
+            }
+    activation_patching(model, template, dataset)
+
+    template = "MPS"
+    dataset = {'clean_tokens': model.to_tokens([
+        'Mary got 3 oranges so now she has 8 after starting with',
+        'Mary got 12 oranges so now she has 19 after starting with',
+        'Mary got 3 oranges so now she has 21 after starting with'
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'Mary got 2 oranges so now she has 8 after starting with',
+                  'Mary got 6 oranges so now she has 19 after starting with',
+                  'Mary got 4 oranges so now she has 21 after starting with']),
+              'answers': [(' 5', ' 6'), (' 7', ' 13'), (' 18', ' 17')]
+            }
+    activation_patching(model, template, dataset)
+
+    template = "MPS-2"
+    dataset = {'clean_tokens': model.to_tokens([
+        'Nadia shared 3 bananas so she only has 2 after starting with',
+        'Nadia shared 4 bananas so she only has 3 after starting with',
+        'Nadia shared 5 bananas so she only has 4 after starting with'
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'Nadia shared 2 bananas so she only has 2 after starting with',
+                  'Nadia shared 6 bananas so she only has 3 after starting with',
+                  'Nadia shared 3 bananas so she only has 4 after starting with']),
+              'answers': [(' 5', ' 4'), (' 7', ' 9'), (' 9', ' 7')]
+            }
+    activation_patching(model, template, dataset)
+
+    template = "MRS"
+    dataset = {'clean_tokens': model.to_tokens([
+        'Sarah needed 3 pencils so she could complete her set of 10 after starting with',
+        'Sarah needed 5 pencils so she could complete her set of 12 after starting with',
+        'Sarah needed 4 pencils so she could complete her set of 15 after starting with'
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'Sarah needed 4 pencils so she could complete her set of 10 after starting with',
+                  'Sarah needed 3 pencils so she could complete her set of 12 after starting with',
+                  'Sarah needed 6 pencils so she could complete her set of 15 after starting with']),
+              'answers': [(' 7', ' 6'), (' 7', ' 9'), (' 11', ' 9')]
+            }
+    activation_patching(model, template, dataset)
+
+def activation_patching_emotional_analysis(model):
+    """
+    Runs activation patching experiments on emotional reasoning templates.
+    
+    Analyzes different types of emotional relationships using templates:
+    - EAB (Emotional Action Because)
+    - ERS (Emotional Response So)
+    - ESB (Emotional State Because)
+    - ECS (Emotional Consequence So)
+    - ECB (Emotional Cause Because)
+    
+    Args:
+        model: The transformer model to analyze
+    """
+    print("Starting activation patching analysis across emotional templates...")
+
+    # Template: "Tom {emotion} because Pete {action}"
+    template = "EAB"
+    base_template = "Tom {} because Pete was {}"
+
+    clean_emotions = [
+        ("laughed", "joked"),
+        ("cried", "yelled"), 
+        ("frowned", "lied")
+    ]
+    corrupted_emotions = [
+        ("cried", "yelled"),
+        ("smiled", "laughed"), 
+        ("frowned", "cried")
+    ]
+
+    answers = [
+        (' joked', ' slept'),
+        (' yelled', ' smiled'),
+        (' lied', ' waved')
+    ]
+
+    print(clean_emotions)
+    exit()
+    
+    dataset = {
+        'clean_tokens': model.to_tokens([
+            base_template.format(emotion) 
+            for emotion in clean_emotions
+        ]),
+        'corrupted_tokens': model.to_tokens([
+            base_template.format(emotion)
+            for emotion in corrupted_emotions
+        ]),
+        'answers': answers
+    }
+
+    print(dataset)
+    activation_patching(model, template, dataset)
+
+    exit()
+
+    template = "ERS"
+    dataset = {'clean_tokens': model.to_tokens([
+        'Lisa felt scared so she decided to',
+        'Lisa felt excited so she decided to',
+        'Lisa felt angry so she decided to',
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'Lisa felt tired so she decided to',
+                  'Lisa felt hungry so she decided to',
+                  'Lisa felt cold so she decided to']),
+              'answers': [(' hide', ' sleep'), (' dance', ' eat'), (' shout', ' warm')]
+            }
+    activation_patching(model, template, dataset)
+
+    template = "ESB"
+    dataset = {'clean_tokens': model.to_tokens([
+        'Emma feels lonely because her best friend is',
+        'Emma feels proud because her project is',
+        'Emma feels worried because her test is',
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'Emma feels cold because her best friend is',
+                  'Emma feels tired because her project is',
+                  'Emma feels hungry because her test is']),
+              'answers': [(' away', ' here'), (' perfect', ' late'), (' tomorrow', ' today')]
+            }
+    activation_patching(model, template, dataset)
+
+    template = "ECS"
+    dataset = {'clean_tokens': model.to_tokens([
+        'David received good news so he felt very',
+        'David lost his wallet so he felt very',
+        'David won the race so he felt very',
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'David read a book so he felt very',
+                  'David ate lunch so he felt very',
+                  'David took a walk so he felt very']),
+              'answers': [(' happy', ' tired'), (' upset', ' full'), (' proud', ' relaxed')]
+            }
+    activation_patching(model, template, dataset)
+
+    template = "ECB"
+    dataset = {'clean_tokens': model.to_tokens([
+        'Sarah is happy because she got a new',
+        'Sarah is nervous because she has a big',
+        'Sarah is excited because she won the',
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'Sarah is tired because she got a new',
+                  'Sarah is hungry because she has a big',
+                  'Sarah is cold because she won the']),
+              'answers': [(' puppy', ' book'), (' test', ' lunch'), (' prize', ' coat')]
+            }
+    activation_patching(model, template, dataset)
+
+def activation_patching_physical_analysis(model):
+    """
+    Runs activation patching experiments on physical causation templates.
+    
+    Analyzes different types of physical cause-effect relationships using templates:
+    - PCB (Physical Cause Because) - Direct physical causes
+    - PCS (Physical Consequence So) - Resulting physical states
+    - PMB (Physical Material Because) - Material properties
+    - PFB (Physical Force Because) - Force and motion
+    - PSB (Physical State Because) - Environmental conditions
+    
+    Args:
+        model: The transformer model to analyze
+    """
+    print("Starting activation patching analysis across physical templates...")
+
+    # The <object> broke because it 
+    template = "PCB"
+    dataset = {'clean_tokens': model.to_tokens([
+        'The glass broke because it fell on the',
+        'The metal bent because it was hit with the',
+        'The ice melted because it was left in the',
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'The glass floated because it fell on the',
+                  'The metal sparkled because it was hit with the',
+                  'The ice expanded because it was left in the']),
+              'answers': [(' concrete', ' carpet'),
+                        (' hammer', ' feather'),
+                        (' heat', ' shade')]
+            }
+    activation_patching(model, template, dataset)
+
+    template = "PCS"
+    dataset = {'clean_tokens': model.to_tokens([
+        'The metal was hot so it turned',
+        'The ball was hit so it went',
+        'The ice was warm so it turned',
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'The metal was new so it turned',
+                  'The ball was old so it went',
+                  'The ice was cold so it turned']),
+              'answers': [(' red', ' grey'), (' up', ' down'), (' soft', ' hard')]
+            }
+    activation_patching(model, template, dataset)
+
+    template = "PMB"
+    dataset = {'clean_tokens': model.to_tokens([
+        'The cloth tore because it was too',
+        'The rope broke because it was too',
+        'The food spoiled because it was too',
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'The cloth moved because it was too',
+                  'The rope stretched because it was too',
+                  'The food changed because it was too']),
+              'answers': [(' thin', ' soft'), (' weak', ' long'), (' hot', ' fresh')]
+            }
+    activation_patching(model, template, dataset)
+
+    template = "PFB"
+    dataset = {'clean_tokens': model.to_tokens([
+        'The tree fell because the wind was too',
+        'The car slid because the road was too',
+        'The boat tipped because the sea was too',
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'The tree bent because the wind was too',
+                  'The car stopped because the road was too',
+                  'The boat moved because the sea was too']),
+              'answers': [(' strong', ' weak'), (' wet', ' rough'), (' wild', ' calm')]
+            }
+    activation_patching(model, template, dataset)
+
+    template = "PSB"
+    dataset = {'clean_tokens': model.to_tokens([
+        'The steel rusted because the air was too',
+        'The plant died because the soil was too',
+        'The food melted because the room was too',
+        ]),
+              'corrupted_tokens': model.to_tokens([
+                  'The steel shone because the air was too',
+                  'The plant grew because the soil was too',
+                  'The food froze because the room was too']),
+              'answers': [(' wet', ' dry'), (' dry', ' rich'), (' hot', ' cold')]
+            }
     activation_patching(model, template, dataset)
 
 def main():
@@ -331,15 +672,20 @@ def main():
     Sets up the model and directory structure, then runs various analyses
     to understand how the model processes causal relationships.
     """
-    print(f"Initializing analysis with model: {model_name}")
     global model_name
     model_name = "gpt2-small"
+    # model_name = "gpt2-medium"
+    print(f"Initializing analysis with model: {model_name}")
     if not os.path.exists(f"../results/{model_name}"):
         os.makedirs(f"../results/{model_name}")
     model: HookedTransformer = HookedTransformer.from_pretrained(model_name)
     # analyze_delimiter_attention(model)
     # analyze_causal_attention(model)
-    activation_patching_analysis(model)
+    activation_patching_semantic_analysis(model)
+    # activation_patching_mathematical_analysis(model)
+    # activation_patching_emotional_analysis(model)
+    # activation_patching_physical_analysis(model)
+
 
 if __name__ == "__main__":
     main()
