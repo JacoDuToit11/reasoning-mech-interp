@@ -231,30 +231,32 @@ def activation_patching(model, category, template_title, dataset):
         patched_logit_diff = logits_to_ave_logit_diff(logits, answer_tokens)
         return (patched_logit_diff - corrupted_logit_diff) / (clean_logit_diff - corrupted_logit_diff)
 
-    act_patch_resid_pre = patching.get_act_patch_resid_pre(
-        model=model,
-        corrupted_tokens=corrupted_tokens,
-        clean_cache=clean_cache,
-        patching_metric=logit_diff_metric
-    )
+    if not skip_resid_pre:
+    
+        act_patch_resid_pre = patching.get_act_patch_resid_pre(
+            model=model,
+            corrupted_tokens=corrupted_tokens,
+            clean_cache=clean_cache,
+            patching_metric=logit_diff_metric
+        )
 
-    labels = [f"{tok} {i}" for i, tok in enumerate(model.to_str_tokens(clean_tokens[0]))]
-    plt.figure(figsize=(8, 6))
-    plt.imshow(
-        act_patch_resid_pre.cpu(),
-        cmap="viridis",
-        aspect="auto"
-    )
+        labels = [f"{tok} {i}" for i, tok in enumerate(model.to_str_tokens(clean_tokens[0]))]
+        plt.figure(figsize=(8, 6))
+        plt.imshow(
+            act_patch_resid_pre.cpu(),
+            cmap="viridis",
+            aspect="auto"
+        )
 
-    plt.colorbar(label="Activation Values")
-    plt.xlabel("Position")
-    plt.ylabel("Layer")
-    plt.title("Resid_Pre Activation Patching")
+        plt.colorbar(label="Activation Values")
+        plt.xlabel("Position")
+        plt.ylabel("Layer")
+        plt.title("Resid_Pre Activation Patching")
 
-    if 'labels' in locals() and labels is not None:
-        plt.xticks(ticks=np.arange(len(labels)), labels=labels, rotation=45)
+        if 'labels' in locals() and labels is not None:
+            plt.xticks(ticks=np.arange(len(labels)), labels=labels, rotation=45)
 
-    plt.savefig(f"../results/{model_name}/{category}/activation_patching_per_block_{template_title}.png")
+        plt.savefig(f"../results/{model_name}/{category}/activation_patching_per_block_{template_title}.png")
 
     act_patch_attn_head_out_all_pos = patching.get_act_patch_attn_head_out_all_pos(
         model,
@@ -263,13 +265,25 @@ def activation_patching(model, category, template_title, dataset):
         logit_diff_metric
     )
 
+    # Get the maximum absolute value from the data
+    max_abs_val = abs(act_patch_attn_head_out_all_pos.cpu()).max()
+    
     plt.figure(figsize=(10, 8))
-    plt.imshow(act_patch_attn_head_out_all_pos.cpu(), cmap="viridis", aspect="auto")
+    plt.imshow(
+        act_patch_attn_head_out_all_pos.cpu(),
+        cmap="RdBu",
+        aspect="auto",
+        vmin=-max_abs_val,  # Symmetric negative bound
+        vmax=max_abs_val    # Symmetric positive bound
+    )
     plt.colorbar(label="Value")
     plt.xlabel("Head")
-    plt.ylabel("Position")
+    plt.ylabel("Layer")
     plt.title("Attention Head Outputs Heatmap")
     plt.savefig(f"../results/{model_name}/{category}/activation_patching_attn_head_out_all_pos_{template_title}.png")
+
+    # Return the attention head outputs for averaging
+    return act_patch_attn_head_out_all_pos
 
 def create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template):
     dataset = {
@@ -289,9 +303,9 @@ def create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template):
 
     return dataset
 
-def activation_patching_semantic_analysis(model):
+def activation_patching_paper_templates_analysis(model):
     """
-    Runs activation patching experiments on various templates of prompts.
+    Runs activation patching experiments on various templates of prompts from paper.
     
     Analyzes different types of causal relationships using templates:
     - ALB (Action Location Because)
@@ -304,24 +318,28 @@ def activation_patching_semantic_analysis(model):
         model: The transformer model to analyze
     """
     print("Starting activation patching analysis across semantic templates...")
-    category = "semantic"
+    category = "paper_templates"
+    
+    # Store all attention head outputs
+    all_attn_head_outputs = []
     
     # Template: "John had to [ACTION] because he is going to the [LOCATION]"
     template_title = "ALB"
     base_template = "John had to {} because he is going to the"
     
     clean_pairs = [
-        ("dress", "dance"),
-        ("pray", "church"),
-        ("study", "test")
+        ("dress", "show"),
+        ("shave", "meeting"),
+        ("study", "exam")
     ]
     corrupted_pairs = [
-        ("run", "park"),
-        ("rest", "gym"), 
+        ("work", "office"),
+        ("train", "gym"), 
         ("pack", "airport")
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
     # Template: "Jane will [ACTION] it because John is getting the [OBJECT]"
     template_title = "AOB"
@@ -329,15 +347,16 @@ def activation_patching_semantic_analysis(model):
     clean_pairs = [
         ("read", "book"),
         ("eat", "food"),
-        ("throw", "ball")
+        ("slice", "bread")
     ]
     corrupted_pairs = [
-        ("move", "box"),
+        ("heat", "pot"),
         ("sketch", "pencil"),
-        ("play", "guitar")
+        ("wash", "dish")
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
     # Template: "Mary went to the [LOCATION] so she wants to [ACTION]"
     template_title = "ALS"
@@ -348,12 +367,13 @@ def activation_patching_semantic_analysis(model):
         ("airport", "fly")
     ]
     corrupted_pairs = [
-        ("test", "write"),
+        ("exam", "write"),
         ("gym", "exercise"),
         ("library", "read")
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
     # Template: "Nadia will be at the [LOCATION] so she will [ACTION]"
     template_title = "ALS-2"
@@ -366,26 +386,48 @@ def activation_patching_semantic_analysis(model):
     corrupted_pairs = [
         ("library", "read"),
         ("gym", "exercise"),
-        ("hospital", "work")
+        ("store", "shop")
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
     # Template: "Sara wanted to [ACTION] so Mark decided to get the [OBJECT]"
     template_title = "AOS"
     base_template = "Sara wanted to {} so Mark decided to get the"
     clean_pairs = [
-        ("write", "book"),
-        ("pray", "bible"),
-        ("study", "book")
+        ("study", "book"),
+        ("paint", "canvas"),
+        ("write", "pen")
     ]
     corrupted_pairs = [
-        ("go", "car"),
-        ("sleep", "room"),
-        ("play", "guitar")
+        ("wash", "dish"),
+        ("sketch", "pencil"),
+        ("cook", "pot"),
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Calculate and save the average
+    avg_attn_head_out = t.stack(all_attn_head_outputs).mean(dim=0)
+    
+    # Plot and save the average
+    plt.figure(figsize=(10, 8))
+    max_abs_val = abs(avg_attn_head_out.cpu()).max()
+    plt.imshow(
+        avg_attn_head_out.cpu(),
+        cmap="RdBu",
+        aspect="auto",
+        vmin=-max_abs_val,
+        vmax=max_abs_val
+    )
+    plt.colorbar(label="Value")
+    plt.xlabel("Head")
+    plt.ylabel("Layer")
+    plt.title("Average Attention Head Outputs Across Semantic Templates")
+    plt.savefig(f"../results/{model_name}/{category}/activation_patching_attn_head_out_avg.png")
+    plt.close()
 
 def activation_patching_mathematical_analysis(model):
     """
@@ -403,165 +445,358 @@ def activation_patching_mathematical_analysis(model):
     """
     print("Starting activation patching analysis across mathematical templates...")
     category = "mathematical"
+    all_attn_head_outputs = []
+
     # Template: "John had [X] apples but now has 8 because Mary gave him"
-    template_title = "MAB"
-    base_template = "John had {} apples but now has 8 because Mary gave him"
+    template_title = "MATH-B-1"
+    base_template = "John had {} apples but now has 10 because Mary gave him"
     clean_pairs = [
-        ("5", "3"),
-        ("3", "4"),
-        ("12", "7")
+        ("1", "9"),
+        ("8", "2"),
+        ("6", "4")
     ]
     corrupted_pairs = [
-        ("3", "5"),
-        ("6", "1"),
-        ("4", "15")
+        ("3", "7"),
+        ("5", "5"),
+        ("0", "10")
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
     # Template: "Jane needs [X] apples because she already has 6 and wants a total of"
-    template_title = "MAB-2"
+    template_title = "MATH-B-2"
     base_template = "Jane needs {} apples because she already has 6 and wants a total of"
     clean_pairs = [
         ("4", "10"),
-        ("10", "31"),
-        ("110", "122")
+        ("25", "31"),
+        ("116", "122")
     ]
     corrupted_pairs = [
         ("3", "9"),
-        ("12", "33"),
-        ("57", "69")
+        ("27", "33"),
+        ("63", "69")
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
     # Template: "Mary got [X] oranges so now she has 8 after starting with"
-    template_title = "MPS"
+    template_title = "MATH-S-1"
     base_template = "Mary got {} oranges so now she has 8 after starting with"
     clean_pairs = [
-        ("3", "5"),
-        ("12", "7"),
-        ("3", "18")
+        ("3", "5"), 
+        ("4", "4"),  
+        ("2", "6")  
     ]
     corrupted_pairs = [
-        ("2", "6"),
-        ("6", "13"),
-        ("4", "17")
+        ("5", "3"),  
+        ("6", "2"),  
+        ("1", "7")  
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
     # Template: "Nadia shared [X] bananas so she only has 2 after starting with"
-    template_title = "MPS-2"
+    template_title = "MATH-S-2"
     base_template = "Nadia shared {} bananas so she only has 2 after starting with"
     clean_pairs = [
         ("3", "5"),
-        ("4", "7"),
-        ("5", "9")
+        ("4", "6"),
+        ("118", "120")
     ]
     corrupted_pairs = [
         ("2", "4"),
-        ("6", "9"),
-        ("3", "7")
+        ("19", "21"),
+        ("7", "9")
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
     # Template: "Sarah needed [X] pencils so she could complete her set of 10 after starting with"
-    template_title = "MRS"
+    template_title = "MATH-S-3"
     base_template = "Sarah needed {} pencils so she could complete her set of 10 after starting with"
     clean_pairs = [
         ("3", "7"),
-        ("5", "7"),
-        ("4", "11")
+        ("5", "5"),
+        ("4", "6")
     ]
     corrupted_pairs = [
         ("4", "6"),
-        ("3", "9"),
-        ("6", "9")
+        ("2", "8"),
+        ("1", "9")
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
-def activation_patching_arithmetic_analysis(model):
-    """
-    Runs activation patching experiments on basic arithmetic word problems.
+    # Calculate and save the average
+    avg_attn_head_out = t.stack(all_attn_head_outputs).mean(dim=0)
     
-    Analyzes different types of arithmetic operations using templates:
-    - ADD (Addition word problems with constant addend)
-    - SUB (Subtraction word problems with constant subtrahend)
-    - MUL (Multiplication word problems with constant multiplier)
-    - DIV (Division word problems with constant divisor)
-    
-    Args:
-        model: The transformer model to analyze
-    """
-    print("Starting activation patching analysis across arithmetic templates...")
-    category = "arithmetic"
+    # Plot and save the average
+    plt.figure(figsize=(10, 8))
+    max_abs_val = abs(avg_attn_head_out.cpu()).max()
+    plt.imshow(
+        avg_attn_head_out.cpu(),
+        cmap="RdBu",
+        aspect="auto",
+        vmin=-max_abs_val,
+        vmax=max_abs_val
+    )
+    plt.colorbar(label="Value")
+    plt.xlabel("Head")
+    plt.ylabel("Layer")
+    plt.title("Average Attention Head Outputs Across Mathematical Templates")
+    plt.savefig(f"../results/{model_name}/{category}/activation_patching_attn_head_out_avg.png")
+    plt.close()
 
-    # Template: "If Tom has [X] apples and gets 3 more, he will have"
-    template_title = "ADD"
-    base_template = "If Tom has {} apples and gets 3 more, he will have"
+def activation_patching_coding_analysis(model):
+    """
+    Runs activation patching experiments on simple coding reasoning templates.
+    
+    Analyzes different types of programming logic including:
+    - Variable assignment and values
+    - Simple conditionals
+    - Basic loops
+    - Function return values
+    - Array/list operations
+    
+    Both clean and corrupted pairs represent valid code with correct outputs,
+    but demonstrate different programming patterns to achieve the results.
+    """
+    print("Starting activation patching analysis across coding reasoning templates...")
+    category = "coding"
+    all_attn_head_outputs = []
+
+    # Variable Assignment
+    template_title = "VARS"
+    base_template = "x = 5\ny = {}\nz = x + y\nz equals"
     clean_pairs = [
-        ("2", "5"),
+        ("3", "8"),    # Adding small numbers
+        ("10", "15"),  # Adding larger numbers
+        ("0", "5")     # Adding zero
+    ]
+    corrupted_pairs = [
+        ("15", "20"),  # Different but valid additions
+        ("25", "30"),
+        ("20", "25")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Conditionals
+    template_title = "IF"
+    base_template = "x = {}\nif x < 10:\n    print('small')\nelse:\n    print('big')\nThe code will print"
+    clean_pairs = [
+        ("5", "small"),    # Single digit numbers
+        ("3", "small"),
+        ("2", "small")
+    ]
+    corrupted_pairs = [
+        ("15", "big"),     # Double digit numbers
+        ("12", "big"),
+        ("11", "big")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Loops
+    template_title = "LOOP"
+    base_template = "total = 0\nfor i in range({}):\n    total += 2\ntotal equals"
+    clean_pairs = [
+        ("3", "6"),    # Small ranges
+        ("4", "8"),
+        ("5", "10")
+    ]
+    corrupted_pairs = [
+        ("10", "20"),  # Larger ranges
+        ("8", "16"),
+        ("6", "12")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Function Returns
+    template_title = "FUNC"
+    base_template = "def func(x):\n    return x * {}\n\nresult = func(2)\nresult equals"
+    clean_pairs = [
+        ("3", "6"),    # Multiplication by small numbers
+        ("4", "8"),
+        ("5", "10")
+    ]
+    corrupted_pairs = [
+        ("10", "20"),  # Multiplication by larger numbers
+        ("8", "16"),
+        ("6", "12")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # List Operations
+    template_title = "LIST"
+    base_template = "nums = [1, 2, {}]\nsum = 0\nfor n in nums:\n    sum += n\nsum equals"
+    clean_pairs = [
+        ("3", "6"),     # Small numbers in list
         ("4", "7"),
-        ("7", "10")
+        ("5", "8")
     ]
     corrupted_pairs = [
-        ("5", "8"),
-        ("6", "9"),
-        ("8", "11")
+        ("10", "13"),   # Larger numbers in list
+        ("15", "18"),
+        ("20", "23")
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
-    # Template: "If Sarah has [X] candies and gives away 4, she will have"
-    template_title = "SUB"
-    base_template = "If Sarah has {} candies and gives away 4, she will have"
-    clean_pairs = [
-        ("9", "5"),
-        ("12", "8"),
-        ("15", "11")
-    ]
-    corrupted_pairs = [
-        ("10", "6"),
-        ("14", "10"),
-        ("16", "12")
-    ]
-    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    # Calculate and save the average
+    avg_attn_head_out = t.stack(all_attn_head_outputs).mean(dim=0)
+    
+    # Plot and save the average
+    plt.figure(figsize=(10, 8))
+    max_abs_val = abs(avg_attn_head_out.cpu()).max()
+    plt.imshow(
+        avg_attn_head_out.cpu(),
+        cmap="RdBu",
+        aspect="auto",
+        vmin=-max_abs_val,
+        vmax=max_abs_val
+    )
+    plt.colorbar(label="Value")
+    plt.xlabel("Head")
+    plt.ylabel("Layer")
+    plt.title("Average Attention Head Outputs Across Coding Templates")
+    plt.savefig(f"../results/{model_name}/{category}/activation_patching_attn_head_out_avg.png")
+    plt.close()
 
-    # Template: "If each box has 5 chocolates and there are [X] boxes, there are"
-    template_title = "MUL"
-    base_template = "If each box has 5 chocolates and there are {} boxes, there are"
-    clean_pairs = [
-        ("3", "15"),
-        ("4", "20"),
-        ("6", "30")
-    ]
-    corrupted_pairs = [
-        ("2", "10"),
-        ("5", "25"),
-        ("7", "35")
-    ]
-    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+def activation_patching_coding_logic_analysis(model):
+    """
+    Runs activation patching experiments on logical coding templates.
+    
+    Analyzes different types of programming logic including:
+    - String operations
+    - Boolean logic
+    - List operations (non-numeric)
+    - Dictionary lookups
+    - Control flow
+    
+    Both clean and corrupted pairs represent valid code with correct outputs,
+    but demonstrate different programming patterns to achieve the results.
+    """
+    print("Starting activation patching analysis across logical coding templates...")
+    category = "coding_logic"
+    all_attn_head_outputs = []
 
-    # Template: "If [X] cookies are shared equally among 4 friends, each friend gets"
-    template_title = "DIV"
-    base_template = "If {} cookies are shared equally among 4 friends, each friend gets"
+    # String Operations
+    template_title = "STRING"
+    base_template = "text = '{}'\nif text.startswith('a'):\n    result = 'yes'\nelse:\n    result = 'no'\nresult equals"
     clean_pairs = [
-        ("12", "3"),
-        ("16", "4"),
-        ("20", "5")
+        ("apple", "yes"),      # Simple 'a' words
+        ("ant", "yes"),
+        ("animal", "yes")
     ]
     corrupted_pairs = [
-        ("8", "2"),
-        ("24", "6"),
-        ("28", "7")
+        ("banana", "no"),      # Non-'a' words
+        ("python", "no"),
+        ("code", "no")
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
-    activation_patching(model, category, template_title, dataset)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Boolean Logic
+    template_title = "BOOL"
+    base_template = "is_sunny = {}\nis_warm = True\ncan_swim = is_sunny and is_warm\ncan_swim equals"
+    clean_pairs = [
+        ("True", "True"),      # Both conditions true
+        ("True", "True"),
+        ("True", "True")
+    ]
+    corrupted_pairs = [
+        ("False", "False"),    # One condition false
+        ("False", "False"),
+        ("False", "False")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # List Operations (non-numeric)
+    template_title = "LIST"
+    base_template = "fruits = ['apple', 'banana', '{}']\nif 'apple' in fruits:\n    result = 'found'\nelse:\n    result = 'missing'\nresult equals"
+    clean_pairs = [
+        ("orange", "found"),    # Lists with apple
+        ("grape", "found"),
+        ("mango", "found")
+    ]
+    corrupted_pairs = [
+        ("banana", "found"),    # Different lists with apple
+        ("kiwi", "found"),
+        ("peach", "found")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Dictionary Operations
+    template_title = "DICT"
+    base_template = "user = {{'name': '{}', 'active': True}}\nif user['active']:\n    status = 'online'\nelse:\n    status = 'offline'\nstatus equals"
+    clean_pairs = [
+        ("Alice", "online"),    # Different active users
+        ("Bob", "online"),
+        ("Charlie", "online")
+    ]
+    corrupted_pairs = [
+        ("David", "online"),    # Other active users
+        ("Eve", "online"),
+        ("Frank", "online")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Control Flow
+    template_title = "FLOW"
+    base_template = "status = '{}'\nif status == 'error':\n    msg = 'failed'\nelif status == 'success':\n    msg = 'passed'\nelse:\n    msg = 'unknown'\nmsg equals"
+    clean_pairs = [
+        ("error", "failed"),     # Error cases
+        ("error", "failed"),
+        ("error", "failed")
+    ]
+    corrupted_pairs = [
+        ("success", "passed"),   # Success cases
+        ("success", "passed"),
+        ("success", "passed")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Calculate and save the average
+    avg_attn_head_out = t.stack(all_attn_head_outputs).mean(dim=0)
+    
+    # Plot and save the average
+    plt.figure(figsize=(10, 8))
+    max_abs_val = abs(avg_attn_head_out.cpu()).max()
+    plt.imshow(
+        avg_attn_head_out.cpu(),
+        cmap="RdBu",
+        aspect="auto",
+        vmin=-max_abs_val,
+        vmax=max_abs_val
+    )
+    plt.colorbar(label="Value")
+    plt.xlabel("Head")
+    plt.ylabel("Layer")
+    plt.title("Average Attention Head Outputs Across Logical Coding Templates")
+    plt.savefig(f"../results/{model_name}/{category}/activation_patching_attn_head_out_avg.png")
+    plt.close()
 
 def activation_patching_emotional_analysis(model):
     """
@@ -579,103 +814,95 @@ def activation_patching_emotional_analysis(model):
     """
     print("Starting activation patching analysis across emotional templates...")
     category = "emotional"
+    all_attn_head_outputs = []
 
-    # Template: "Tom [EMOTION] because Pete [ACTION]"
+    # Template: "Tom [ACTION] because Pete made him feel [EMOTION]"
     template_title = "EAB"
-    base_template = "Tom {} because Pete {}"
-
-    clean_emotions = [
-        ("laughed", "joked"),
-        ("cried", "yelled"), 
-        ("frowned", "lied")
+    base_template = "Tom {} because Pete made him feel"
+    clean_pairs = [
+        ("smiled", "happy"),
+        ("cried", "sad"),
+        ("trembled", "scared")
     ]
-    corrupted_emotions = [
-        ("cried", "yelled"),
-        ("smiled", "laughed"), 
-        ("frowned", "cried")
+    corrupted_pairs = [
+        ("frowned", "angry"),
+        ("laughed", "amused"),
+        ("left", "bad")
     ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
-    answers = [
-        (' joked', ' slept'),
-        (' yelled', ' smiled'),
-        (' lied', ' waved')
+    # Template: "Lisa felt [EMOTION] so she decided to [ACTION]"
+    template_title = "ERS"
+    base_template = "Lisa felt {} so she decided to"
+    clean_pairs = [
+        ("scared", "hide"),
+        ("excited", "dance"),
+        ("angry", "shout")
     ]
+    corrupted_pairs = [
+        ("sad", "cry"),
+        ("jealous", "fight"),
+        ("happy", "laugh")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
 
-    print(clean_emotions)
-    exit()
+    # Template: "Emma feels [EMOTION] because her [OBJECT] is [STATE]"
+    template_title = "ESB"
+    base_template = "Emma feels {} because her best friend is"
+    clean_pairs = [
+        ("lonely", "away"),
+        ("proud", "successful"),
+        ("worried", "sick")
+    ]
+    corrupted_pairs = [
+        ("happy", "here"),
+        ("excited", "visiting"),
+        ("calm", "sleeping")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Template: "Sarah is [EMOTION] because she got a new [OBJECT]"
+    template_title = "ECB"
+    base_template = "Sarah is {} because she got a new"
+    clean_pairs = [
+        ("happy", "puppy"),
+        ("nervous", "job"),
+        ("excited", "gift")
+    ]
+    corrupted_pairs = [
+        ("sad", "problem"),
+        ("proud", "prize"),
+        ("worried", "test")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Calculate and save the average
+    avg_attn_head_out = t.stack(all_attn_head_outputs).mean(dim=0)
     
-    dataset = {
-        'clean_tokens': model.to_tokens([
-            base_template.format(emotion) 
-            for emotion in clean_emotions
-        ]),
-        'corrupted_tokens': model.to_tokens([
-            base_template.format(emotion)
-            for emotion in corrupted_emotions
-        ]),
-        'answers': answers
-    }
-
-    print(dataset)
-    activation_patching(model, template, dataset)
-
-    exit()
-
-    template = "ERS"
-    dataset = {'clean_tokens': model.to_tokens([
-        'Lisa felt scared so she decided to',
-        'Lisa felt excited so she decided to',
-        'Lisa felt angry so she decided to',
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'Lisa felt tired so she decided to',
-                  'Lisa felt hungry so she decided to',
-                  'Lisa felt cold so she decided to']),
-              'answers': [(' hide', ' sleep'), (' dance', ' eat'), (' shout', ' warm')]
-            }
-    activation_patching(model, template, dataset)
-
-    template = "ESB"
-    dataset = {'clean_tokens': model.to_tokens([
-        'Emma feels lonely because her best friend is',
-        'Emma feels proud because her project is',
-        'Emma feels worried because her test is',
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'Emma feels cold because her best friend is',
-                  'Emma feels tired because her project is',
-                  'Emma feels hungry because her test is']),
-              'answers': [(' away', ' here'), (' perfect', ' late'), (' tomorrow', ' today')]
-            }
-    activation_patching(model, template, dataset)
-
-    template = "ECS"
-    dataset = {'clean_tokens': model.to_tokens([
-        'David received good news so he felt very',
-        'David lost his wallet so he felt very',
-        'David won the race so he felt very',
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'David read a book so he felt very',
-                  'David ate lunch so he felt very',
-                  'David took a walk so he felt very']),
-              'answers': [(' happy', ' tired'), (' upset', ' full'), (' proud', ' relaxed')]
-            }
-    activation_patching(model, template, dataset)
-
-    template = "ECB"
-    dataset = {'clean_tokens': model.to_tokens([
-        'Sarah is happy because she got a new',
-        'Sarah is nervous because she has a big',
-        'Sarah is excited because she won the',
-        ]),
-              'corrupted_tokens': model.to_tokens([
-                  'Sarah is tired because she got a new',
-                  'Sarah is hungry because she has a big',
-                  'Sarah is cold because she won the']),
-              'answers': [(' puppy', ' book'), (' test', ' lunch'), (' prize', ' coat')]
-            }
-    activation_patching(model, template, dataset)
+    # Plot and save the average
+    plt.figure(figsize=(10, 8))
+    max_abs_val = abs(avg_attn_head_out.cpu()).max()
+    plt.imshow(
+        avg_attn_head_out.cpu(),
+        cmap="RdBu",
+        aspect="auto",
+        vmin=-max_abs_val,
+        vmax=max_abs_val
+    )
+    plt.colorbar(label="Value")
+    plt.xlabel("Head")
+    plt.ylabel("Layer")
+    plt.title("Average Attention Head Outputs Across Emotional Templates")
+    plt.savefig(f"../results/{model_name}/{category}/activation_patching_attn_head_out_avg.png")
+    plt.close()
 
 def activation_patching_physical_analysis(model):
     """
@@ -766,6 +993,271 @@ def activation_patching_physical_analysis(model):
             }
     activation_patching(model, template, dataset)
 
+def activation_patching_coding_analysis(model):
+    """
+    Runs activation patching experiments on simple coding reasoning templates.
+    
+    Analyzes different types of programming logic including:
+    - Variable assignment and values
+    - Simple conditionals
+    - Basic loops
+    - Function return values
+    - Array/list operations
+    
+    Both clean and corrupted pairs represent valid code with correct outputs,
+    but demonstrate different programming patterns to achieve the results.
+    """
+    print("Starting activation patching analysis across coding reasoning templates...")
+    category = "coding"
+    all_attn_head_outputs = []
+
+    # Variable Assignment
+    template_title = "VARS"
+    base_template = "x = 5\ny = {}\nz = x + y\nz equals"
+    clean_pairs = [
+        ("3", "8"),    # Adding small numbers
+        ("10", "15"),  # Adding larger numbers
+        ("0", "5")     # Adding zero
+    ]
+    corrupted_pairs = [
+        ("15", "20"),  # Different but valid additions
+        ("25", "30"),
+        ("20", "25")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Conditionals
+    template_title = "IF"
+    base_template = "x = {}\nif x < 10:\n    print('small')\nelse:\n    print('big')\nThe code will print"
+    clean_pairs = [
+        ("5", "small"),    # Single digit numbers
+        ("3", "small"),
+        ("2", "small")
+    ]
+    corrupted_pairs = [
+        ("15", "big"),     # Double digit numbers
+        ("12", "big"),
+        ("11", "big")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Loops
+    template_title = "LOOP"
+    base_template = "total = 0\nfor i in range({}):\n    total += 2\ntotal equals"
+    clean_pairs = [
+        ("3", "6"),    # Small ranges
+        ("4", "8"),
+        ("5", "10")
+    ]
+    corrupted_pairs = [
+        ("10", "20"),  # Larger ranges
+        ("8", "16"),
+        ("6", "12")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Function Returns
+    template_title = "FUNC"
+    base_template = "def func(x):\n    return x * {}\n\nresult = func(2)\nresult equals"
+    clean_pairs = [
+        ("3", "6"),    # Multiplication by small numbers
+        ("4", "8"),
+        ("5", "10")
+    ]
+    corrupted_pairs = [
+        ("10", "20"),  # Multiplication by larger numbers
+        ("8", "16"),
+        ("6", "12")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # List Operations
+    template_title = "LIST"
+    base_template = "nums = [1, 2, {}]\nsum = 0\nfor n in nums:\n    sum += n\nsum equals"
+    clean_pairs = [
+        ("3", "6"),     # Small numbers in list
+        ("4", "7"),
+        ("5", "8")
+    ]
+    corrupted_pairs = [
+        ("10", "13"),   # Larger numbers in list
+        ("15", "18"),
+        ("20", "23")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Calculate and save the average
+    avg_attn_head_out = t.stack(all_attn_head_outputs).mean(dim=0)
+    
+    # Plot and save the average
+    plt.figure(figsize=(10, 8))
+    max_abs_val = abs(avg_attn_head_out.cpu()).max()
+    plt.imshow(
+        avg_attn_head_out.cpu(),
+        cmap="RdBu",
+        aspect="auto",
+        vmin=-max_abs_val,
+        vmax=max_abs_val
+    )
+    plt.colorbar(label="Value")
+    plt.xlabel("Head")
+    plt.ylabel("Layer")
+    plt.title("Average Attention Head Outputs Across Coding Templates")
+    plt.savefig(f"../results/{model_name}/{category}/activation_patching_attn_head_out_avg.png")
+    plt.close()
+
+def activation_patching_transitive_analysis(model):
+    """
+    Analyzes the model's ability to handle multi-step (transitive) reasoning.
+    Tests different types of transitive relationships:
+    - Age/Time relationships
+    - Spatial/Location relationships
+    - Family relationships
+    - Comparative relationships
+    """
+    print("Starting activation patching analysis across transitive reasoning templates...")
+    category = "transitive"
+    all_attn_head_outputs = []
+
+    # # Age relationships
+    # template_title = "AGE"
+    # base_template = "Pete is {}. Pete and Andy are the same age. Andy is"
+    # clean_pairs = [
+    #     ("20", "20"),
+    #     ("15", "15"),
+    #     ("30", "30")
+    # ]
+    # corrupted_pairs = [
+    #     ("90", "90"),
+    #     ("5", "5"),
+    #     ("40", "40")
+    # ]
+    # dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    # attn_head_out = activation_patching(model, category, template_title, dataset)
+    # all_attn_head_outputs.append(attn_head_out)
+
+    # Location relationships
+    template_title = "LOCATION"
+    base_template = "Sara is in the {}. Sara and Tom are in the same place. Tom is in the"
+    clean_pairs = [
+        ("kitchen", "kitchen"),
+        ("library", "library"),
+        ("office", "office"),
+        ("classroom", "classroom"),
+        ("cafeteria", "cafeteria"),
+        ("gym", "gym")
+    ]
+    corrupted_pairs = [
+        ("garden", "garden"), 
+        ("park", "park"),
+        ("bedroom", "bedroom"),
+        ("basement", "basement"),
+        ("attic", "attic"),
+        ("garage", "garage")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    template_title = "COLOR"
+    base_template = "The box is {}. The box and ball are the same color. The ball is"
+    clean_pairs = [
+        ("red", "red"),
+        ("blue", "blue"),
+        ("green", "green"),
+        ("yellow", "yellow"),
+        ("purple", "purple"),
+        ("orange", "orange")
+    ]
+    corrupted_pairs = [
+        ("white", "white"),
+        ("black", "black"),
+        ("brown", "brown"),
+        ("pink", "pink"),
+        ("gray", "gray"),
+        ("gold", "gold")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    exit()
+
+    # Family relationships
+    # template_title = "FAMILY"
+    # base_template = "Jane is Alex's {}. Bob is Jane's son. Alex is Bob's"
+    # clean_pairs = [
+    #     ("sister", "aunt"),
+    #     ("mother", "sister"),
+    # ]
+    # corrupted_pairs = [
+    #     ("aunt", "cousin"),
+    #     ("daughter", "grandma")
+    # ]
+    # dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    # attn_head_out = activation_patching(model, category, template_title, dataset)
+    # all_attn_head_outputs.append(attn_head_out)
+
+    # Time relationships
+    template_title = "TIME"
+    base_template = "Event A happened {} Event B. Event B happened before Event C. Event C happened"
+    clean_pairs = [
+        ("before", "last"),
+        ("after", "second"),
+    ]
+    corrupted_pairs = [
+        ("after", "second"),
+        ("before", "last"),
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Cost comparisons
+    template_title = "COST"
+    base_template = "The book costs {} than the pen. The pen costs more than the pencil. The pencil is the"
+    clean_pairs = [
+        ("more", "cheapest"),
+        ("less", "middle"),
+    ]
+    corrupted_pairs = [
+        ("less", "middle"),
+        ("more", "cheapest")
+    ]
+    dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
+    attn_head_out = activation_patching(model, category, template_title, dataset)
+    all_attn_head_outputs.append(attn_head_out)
+
+    # Calculate and save the average
+    avg_attn_head_out = t.stack(all_attn_head_outputs).mean(dim=0)
+    
+    # Plot and save the average
+    plt.figure(figsize=(10, 8))
+    max_abs_val = abs(avg_attn_head_out.cpu()).max()
+    plt.imshow(
+        avg_attn_head_out.cpu(),
+        cmap="RdBu",
+        aspect="auto",
+        vmin=-max_abs_val,
+        vmax=max_abs_val
+    )
+    plt.colorbar(label="Value")
+    plt.xlabel("Head")
+    plt.ylabel("Layer")
+    plt.title("Average Attention Head Outputs Across Transitive Templates")
+    plt.savefig(f"../results/{model_name}/{category}/activation_patching_attn_head_out_avg.png")
+    plt.close()
+
 def main():
     """
     Main entry point for the reasoning interpretation analysis.
@@ -784,10 +1276,18 @@ def main():
     # analyze_causal_attention(model)
     # activation_patching_semantic_analysis(model)
     # activation_patching_mathematical_analysis(model)
-    activation_patching_emotional_analysis(model)
+    # activation_patching_emotional_analysis(model)
     # activation_patching_physical_analysis(model)
     # activation_patching_arithmetic_analysis(model)
+    # activation_patching_transitive_analysis(model)
+    global skip_resid_pre 
+    skip_resid_pre = True
+    activation_patching_coding_logic_analysis(model)
 
+# NOTES:
+# Max has 4 apples, tom has 6, who has more? Combine math and semantic reasoning
+# Coding logic!
+# write code for math type reasoning tasks
 
 if __name__ == "__main__":
     main()
