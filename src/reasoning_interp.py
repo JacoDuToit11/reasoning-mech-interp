@@ -697,14 +697,14 @@ def activation_patching_coding_logic_analysis(model):
     template_title = "STRING"
     base_template = "text = '{}'\nif text.startswith('a'):\n    result = 'yes'\nelse:\n    result = 'no'\nresult equals"
     clean_pairs = [
-        ("apple", "yes"),      # Simple 'a' words
-        ("ant", "yes"),
-        ("animal", "yes")
+        ("art", "yes"),      # Simple 'a' words
+        ("age", "yes"),
+        ("air", "yes")
     ]
     corrupted_pairs = [
-        ("banana", "no"),      # Non-'a' words
-        ("python", "no"),
-        ("code", "no")
+        ("dog", "no"),      # Non-'a' words
+        ("cat", "no"),
+        ("box", "no")
     ]
     dataset = create_patching_dataset(model, clean_pairs, corrupted_pairs, base_template)
     attn_head_out = activation_patching(model, category, template_title, dataset)
@@ -1266,23 +1266,25 @@ def main():
     to understand how the model processes causal relationships.
     """
     global model_name
-    model_name = "gpt2-small"
-    # model_name = "gpt2-medium"
+    # model_name = "gpt2-small"
+    model_name = "gpt2-medium"
     print(f"Initializing analysis with model: {model_name}")
     if not os.path.exists(f"../results/{model_name}"):
         os.makedirs(f"../results/{model_name}")
-    model: HookedTransformer = HookedTransformer.from_pretrained(model_name)
+    model: HookedTransformer = HookedTransformer.from_pretrained(model_name=model_name)
     # analyze_delimiter_attention(model)
     # analyze_causal_attention(model)
-    # activation_patching_semantic_analysis(model)
-    # activation_patching_mathematical_analysis(model)
+    exit()
+    global skip_resid_pre 
+    skip_resid_pre = True
+    activation_patching_paper_templates_analysis(model)
+    activation_patching_mathematical_analysis(model)
     # activation_patching_emotional_analysis(model)
     # activation_patching_physical_analysis(model)
     # activation_patching_arithmetic_analysis(model)
     # activation_patching_transitive_analysis(model)
-    global skip_resid_pre 
-    skip_resid_pre = True
-    activation_patching_coding_logic_analysis(model)
+
+    # activation_patching_coding_logic_analysis(model)
 
 # NOTES:
 # Max has 4 apples, tom has 6, who has more? Combine math and semantic reasoning
