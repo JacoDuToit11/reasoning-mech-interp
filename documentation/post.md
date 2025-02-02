@@ -2,46 +2,34 @@
 
 ## Abstract
 
-Recent work has taken initial steps in analyzing the circuits used by transformer-based large language models (LLMs) for causal reasoning tasks. These studies focused on clear-cut cause-and-effect sentences like *"John had to pack because he is going to the airport"* and analyzed causal interventions on GPT-2 small. They demonstrated that causal syntax, such as *"because"* and *"so"*, is captured in the first few layers of the model, while later layers focus on semantic relationships to perform simple causal reasoning.
+Recent work by [Lee et al.](https://arxiv.org/pdf/2410.21353) has taken initial steps in analyzing the circuits used by transformer-based large language models (LLMs) for simple causal reasoning tasks. Their study focused on clear-cut cause-and-effect sentences like *"John had to pack because he is going to the airport"* and analyzed causal interventions on GPT-2 small. They demonstrated that causal syntax, such as *"because"* and *"so"*, is captured in the first few layers of the model, while later layers focus on semantic relationships to perform simple causal reasoning tasks.
 
 In this study, we extend this analysis by investigating:
 1. How semantic reasoning is processed across LLMs of varying sizes, beyond just GPT-2 small.
 2. The similarities and differences between semantic and mathematical reasoning circuits, identifying whether LLMs use distinct or overlapping attention heads for these tasks.
 
-Our findings suggest that while LLMs consistently localize causal syntax in early layers, different models allocate reasoning tasks to distinct attention heads depending on their scale. Furthermore, we observe structural parallels between semantic and mathematical reasoning, albeit with task-specific variations in head activation patterns. These insights contribute to a broader understanding of LLM interpretability and mechanistic alignment.
+Our findings suggest that while LLMs consistently localize causal syntax in early layers, different models allocate reasoning tasks to distinct attention heads depending on their scale. Furthermore, we observe structural parallels between semantic and mathematical reasoning, albeit with task-specific variations in head activation patterns. These insights contribute to a broader understanding of LLM causal reasoning circuits.
 
 ## Introduction
-
-### What Question Did We Explore?
 
 We investigated how different transformer-based LLMs process causal reasoning tasks at the mechanistic level. Specifically, we aimed to determine:
 
 1. Whether causal reasoning circuits generalize across different model sizes.
 2. How these circuits compare to mathematical reasoning mechanisms.
 
-### Why Is This Important for AI Safety?
-
 Understanding how LLMs reason about causality and semantics is crucial for AI safety. If models rely on shallow heuristics rather than robust reasoning, they may generate misleading outputs or fail to generalize reliably in critical applications. Additionally, if similar circuits underlie different reasoning tasks, targeted interventions may improve model robustness across multiple domains.
-
-### Existing Work
-
-Prior research has focused on analyzing attention heads responsible for causal reasoning in GPT-2 small. Notable studies include:
-- **Locating Causal Syntax in LLMs** (reference needed)
-- **Interpretable Circuits in Transformers** (reference needed)
-
-These works established that causal syntax is captured early in the model's processing pipeline, with later layers refining the interpretation via semantic relationships. However, research has been limited to small-scale models, leaving open questions about generalizability to larger architectures.
 
 ## Locating Causal Syntax in LLMs
 
 ### Methods
 
-To investigate causal reasoning mechanisms across LLMs, we performed the following steps:
+To investigate causal reasoning mechanisms across LLMs, we performed the following steps as proposed by [Lee et al.](https://arxiv.org/pdf/2410.21353):
 
 1. **Dataset Creation**: We developed a syntactically controlled dataset using two templates:
    - Effect-because-Cause: $[e_1,\ldots,e_n, d, c_1,\ldots c_m]$
    - Cause-so-Effect: $[c_1,\ldots c_m, d, e_1,\ldots,e_n]$
    
-   where $c_i$ represents cause tokens, $d$ is the causal delimiter ("because" or "so"), and $e_j$ represents effect tokens. For example: "Alice went to the craft fair because she wants to buy handmade gifts."
+   where $c_i$ represents cause tokens, $d$ is the causal delimiter ("because" or "so"), and $e_j$ represents effect tokens. For example: "Alice went to the craft fair because she wants to buy gifts."
 
 2. **Attention Analysis**: We quantified causal reasoning by measuring:
    - Attention paid to causal delimiters ($P_d$):
@@ -72,84 +60,57 @@ To investigate causal reasoning mechanisms across LLMs, we performed the followi
      - MATH-B-1/2: Basic addition problems
      - MATH-S-1/2/3: Subtraction and logical sequence problems
 
-Each template was designed to test specific aspects of the model's reasoning capabilities while maintaining consistent syntactic structure. The full template specifications are detailed in Appendix B and C.
+The full template specifications are detailed in Appendix B and C.
 
-4. **Comparative Study Across Model Sizes**: We analyzed these patterns across GPT-2 variants to identify consistent causal reasoning circuits.
+4. **Comparative Study Across Model Sizes**: We analyzed these patterns across GPT-2 variants to identify consistent causal reasoning circuits. We looked at GPT-2 small, medium, large, and XL.
 
 ### Results
 
-Our analysis across model scales revealed evolving patterns in causal processing. We examine two key aspects: attention to the "because" delimiter and cause-effect relationship processing. For analysis of the "so" causal marker, see Appendix A.
+For sake of brevity, we only show the results for the "because" template, please see Appendix A for the other template results which showcase similar patterns.
 
-#### Attention to Causal Markers Across Model Scales
+#### Processing of "Because" Across Model Sizes
 
-Our examination of how different GPT-2 variants process the "because" delimiter revealed clear scaling patterns:
+**Figure 1: Attention to "Because" Token Across Model Scales**
 
-1. **GPT-2 Small**: 
-   - Peak activation in layer 2, head 4 (≈0.14-0.16 attention weight)
-   - Concentrated attention patterns in early layers (0-2)
-   - Processing becomes diffuse in deeper layers (6-11)
+<table>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Small</strong><br/>
+<img src="../results/gpt2-small/attention_map_delim_because.png" width="300" height="300" alt="GPT-2 Small: Attention to 'because'"/></td>
+<td style="text-align: center;"><strong>GPT-2 Medium</strong><br/>
+<img src="../results/gpt2-medium/attention_map_delim_because.png" width="300" height="300" alt="GPT-2 Medium: Attention to 'because'"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Large</strong><br/>
+<img src="../results/gpt2-large/attention_map_delim_because.png" width="300" height="300" alt="GPT-2 Large: Attention to 'because'"/></td>
+<td style="text-align: center;"><strong>GPT-2 XL</strong><br/>
+<img src="../results/gpt2-xl/attention_map_delim_because.png" width="300" height="300" alt="GPT-2 XL: Attention to 'because'"/></td>
+</tr>
+</table>
 
-2. **GPT-2 Medium**:
-   - Strongest activation in layer 8, head 8 (≈0.22 attention weight)
-   - More distributed processing across middle layers compared to Small
-   - Shows multiple strong attention points across layers
+#### Processing of Effect-to-Cause Relationships
 
-3. **GPT-2 Large**:
-   - Peak attention in layer 8 (≈0.30 attention weight)
-   - Deeper layers (25-35) maintain sparse but precise attention
-   - Shows stronger specialization than Medium variant
+**Figure 2: Effect-to-Cause Attention Patterns Across Model Scales**
 
-4. **GPT-2 XL**:
-   - Multiple specialized peaks with strongest in layer 6 (≈0.30 attention weight)
-   - Deep layers (30-47) maintain consistent attention patterns
-   - Most sophisticated distribution of attention across all layers
+<table>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Small</strong><br/>
+<img src="../results/gpt2-small/attention_map_cause_effect_because.png" width="300" height="300" alt="GPT-2 Small: Effect-to-Cause Attention"/></td>
+<td style="text-align: center;"><strong>GPT-2 Medium</strong><br/>
+<img src="../results/gpt2-medium/attention_map_cause_effect_because.png" width="300" height="300" alt="GPT-2 Medium: Effect-to-Cause Attention"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Large</strong><br/>
+<img src="../results/gpt2-large/attention_map_cause_effect_because.png" width="300" height="300" alt="GPT-2 Large: Effect-to-Cause Attention"/></td>
+<td style="text-align: center;"><strong>GPT-2 XL</strong><br/>
+<img src="../results/gpt2-xl/attention_map_cause_effect_because.png" width="300" height="300" alt="GPT-2 XL: Effect-to-Cause Attention"/></td>
+</tr>
+</table>
 
-<img src="../results/gpt2-small/attention_map_delim_because.png" width="300" height="300" alt="GPT-2 Small: Attention to 'because'"/>
-<img src="../results/gpt2-medium/attention_map_delim_because.png" width="300" height="300" alt="GPT-2 Medium: Attention to 'because'"/>
-<img src="../results/gpt2-large/attention_map_delim_because.png" width="300" height="300" alt="GPT-2 Large: Attention to 'because'"/>
-<img src="../results/gpt2-xl/attention_map_delim_because.png" width="300" height="300" alt="GPT-2 XL: Attention to 'because'"/>
+### Discussion
 
-#### Directional Processing Across Model Scales
+Our analysis builds upon the findings of Lee et al., who initially observed that causal syntax processing occurs primarily in the early layers of GPT-2 Small. When extending this investigation across larger model scales, we found this pattern holds consistently true: the processing of both causal markers (like "because") and effect-to-cause relationships remains concentrated in the early layers across all model sizes.
 
-Analysis of Effect-to-Cause attention patterns revealed increasingly sophisticated processing mechanisms as models scale:
-
-1. **GPT-2 Small**:
-   - Strong activation in layers 0-2 (≈0.25 attention weight)
-   - Effect-to-Cause attention shows stronger patterns than Cause-to-Effect
-   - Highest attention weights appear in layer 0
-   - Processing becomes progressively diffuse in deeper layers
-
-2. **GPT-2 Medium**:
-   - Strong early layer activation (0-2) with weights reaching ≈0.25
-   - Secondary processing emerges in middle layers (11-14)
-   - Late layers (20-23) show sparse but focused attention patterns
-   - Enhanced layer specialization compared to Small
-
-3. **GPT-2 Large**:
-   - Early layers (0-5) maintain strong attention (≈0.25)
-   - Notable specialization in middle layers (15-20)
-   - More sophisticated cross-attention patterns between distant layers
-   - Clear three-tier processing structure emerges
-
-4. **GPT-2 XL**:
-   - Strongest activation in early layers (0-5) with peaks reaching ≈0.35
-   - Highly specialized head clusters in layers 20-25
-   - Complex cross-layer attention patterns suggest sophisticated multi-hop reasoning
-   - Four distinct processing stages show hierarchical relationship modeling
-
-<img src="../results/gpt2-small/attention_map_cause_effect_because.png" width="300" height="300" alt="GPT-2 Small: Effect-to-Cause Attention"/>
-<img src="../results/gpt2-medium/attention_map_cause_effect_because.png" width="300" height="300" alt="GPT-2 Medium: Effect-to-Cause Attention"/>
-<img src="../results/gpt2-large/attention_map_cause_effect_because.png" width="300" height="300" alt="GPT-2 Large: Effect-to-Cause Attention"/>
-<img src="../results/gpt2-xl/attention_map_cause_effect_because.png" width="300" height="300" alt="GPT-2 XL: Effect-to-Cause Attention"/>
-
-#### Key Findings Across Model Scales
-
-Our cross-model analysis revealed several important trends:
-1. Causal syntax markers are consistently processed in early layers across all models
-2. Larger models show increased specialization, with specific attention heads in deeper layers focusing on refining causal relationships
-3. Processing becomes more modular as model size increases, with distinct stages emerging in larger variants
-4. Peak attention weights increase with model size, suggesting stronger specialization
-5. Larger models maintain meaningful activation patterns even in deep layers, indicating more sophisticated processing
+This consistent localization of syntactic processing in early layers appears to be a fundamental architectural feature of these models, independent of scale. This finding suggests that the basic mechanisms for processing causal syntax may be similar across different model sizes.
 
 ## Locating Semantic Reasoning
 
@@ -161,152 +122,113 @@ We performed activation patching analysis across GPT-2 variants to identify spec
 
 #### Activation Maps Across Model Scales
 
-<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Small: Average Semantic Attention"/>
-<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Medium: Semantic Attention"/>
-<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Large: Semantic Attention"/>
-<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 XL: Semantic Attention"/>
+**Figure 3: Average Semantic Attention Patterns Across Model Scales**
 
-#### Key Findings by Model Scale
+<table>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Small</strong><br/>
+<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Small: Average Semantic Attention"/></td>
+<td style="text-align: center;"><strong>GPT-2 Medium</strong><br/>
+<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Medium: Semantic Attention"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Large</strong><br/>
+<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Large: Semantic Attention"/></td>
+<td style="text-align: center;"><strong>GPT-2 XL</strong><br/>
+<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 XL: Semantic Attention"/></td>
+</tr>
+</table>
 
-##### GPT-2 Small (12 layers, 12 heads)
-- Primary semantic processing in Head 8, Layer 8
-- Secondary processing in Head 3, Layer 13
-- Early feature detection in Head 0, Layer 0
-- Cooperative processing group in Layers 10-11
+### Discussion
 
-##### GPT-2 Medium (24 layers, 16 heads)
-- Strongest semantic attention in Head 0, Layer 19
-- Consistent processing in Head 3, Layer 13
-- Semantic integration circuit in Heads 14-15, Layers 20-22
-- Information sharing between Layers 15-18
+Our analysis reveals clear patterns in how semantic processing scales across GPT-2 variants:
 
-##### GPT-2 Large (36 layers, 20 heads)
-- Peak semantic activation in Head 5, Layer 30
-- Contextual integration in Head 2, Layer 25
-- Higher-order relationships in Head 15, Layer 35
-- Semantic processing network in Layers 27-32
+**Key Circuits by Model Size:**
 
-##### GPT-2 XL (48 layers, 25 heads)
-- Consistent strong activation in Head 5, Layer 30
-- Specialized processing in Head 20, Layer 40
-- Distributed activation across Heads 15-18 in Layers 25-35
-- Multiple redundant circuits with similar patterns
+GPT-2 Small (12 layers):
+- Layer 8, Head 8
+- Layer 10, Head 0
+- Layer 10, Head 10
+
+GPT-2 Medium (24 layers):
+- Layer 19, Head 0
+- Layer 13, Head 3
+- Layers 20-22, Heads 14-15
+
+GPT-2 Large (36 layers):
+- Layer 30, Head 5
+- Layer 25, Head 2
+- Layer 35, Head 15
+
+GPT-2 XL (48 layers):
+- Layer 30, Head 5
+- Layer 40, Head 20
+- Layers 25-35, Heads 15-18
 
 ### Discussion
 
 The activation patching analysis reveals that semantic processing relies on specific attention heads that maintain consistent roles across different contexts. While smaller models concentrate semantic processing in a few powerful heads, larger models distribute this functionality across interconnected circuits. This architectural difference suggests a transition from single-point processing to more robust, distributed semantic analysis as models scale.
 
-The presence of consistent activation patterns across different semantic contexts indicates these circuits are fundamental to the models' semantic processing capabilities rather than artifacts of specific inputs. The evolution from concentrated to distributed processing may explain larger models' improved robustness in semantic tasks.
+The presence of consistent activation patterns across different semantic contexts indicates these circuits are fundamental to the models' semantic processing capabilities rather than artifacts of specific inputs.
 
 ## Locating Mathematical Reasoning
 
 ### Methods
 
-We applied similar activation patching analysis across GPT-2 variants to identify attention heads responsible for mathematical reasoning. Our analysis examined attention patterns when processing mathematical relationships, focusing on head-specific activations and their consistency across different mathematical contexts. The results shown here represent averages across all templates; individual template results can be found in Appendix C.
+We performed activation patching analysis across GPT-2 variants to identify specific attention heads responsible for mathematical processing. Our analysis examined attention patterns when processing mathematical relationships, focusing on head-specific activations and their consistency across different mathematical contexts. The results shown here represent averages across all templates; individual template results can be found in Appendix C.
 
 ### Results
 
-#### Circuit Analysis Across Model Scales
+#### Activation Maps Across Model Scales
 
-##### GPT-2 Small (12 layers, 12 heads)
-- **Primary Mathematical Circuit**:
-  - Layer 17, Head 0 shows strongest activation (0.25-0.30)
-  - Layer 19, Head 12 exhibits consistent secondary activation (0.20-0.25)
-- **Supporting Circuits**:
-  - Layer 0, Head 0 shows early feature detection (0.10-0.15)
-  - Layers 15-20 form a cooperative processing network
+**Figure 4: Average Mathematical Attention Patterns Across Model Scales**
 
-<img src="../results/gpt2-small/mathematical/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Small: Average Mathematical Attention"/>
+<table>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Small</strong><br/>
+<img src="../results/gpt2-small/mathematical/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Small: Average Mathematical Attention"/></td>
+<td style="text-align: center;"><strong>GPT-2 Medium</strong><br/>
+<img src="../results/gpt2-medium/mathematical/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Medium: Mathematical Attention"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Large</strong><br/>
+<img src="../results/gpt2-large/mathematical/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Large: Mathematical Attention"/></td>
+<td style="text-align: center;"><strong>GPT-2 XL</strong><br/>
+<img src="../results/gpt2-xl/mathematical/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 XL: Mathematical Attention"/></td>
+</tr>
+</table>
 
-##### GPT-2 Medium (24 layers, 16 heads)
-- **Core Mathematical Heads**:
-  - Layer 25, Head 3 demonstrates strongest mathematical attention (0.20-0.25)
-  - Layer 30, Head 15 shows consistent activation across contexts (0.15-0.20)
-- **Auxiliary Circuits**:
-  - Heads 12-14 in layers 25-30 form a mathematical integration circuit
-  - Cross-attention patterns between layers 20-25 suggest information sharing
+### Discussion
 
-<img src="../results/gpt2-medium/mathematical/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Medium: Mathematical Attention"/>
+Our analysis reveals clear patterns in how mathematical processing scales across GPT-2 variants:
 
-##### GPT-2 Large (36 layers, 20 heads)
-- **Primary Processing Circuit**:
-  - Layer 25, Head 5 shows peak mathematical activation (0.20)
-  - Layer 35, Head 15 exhibits strong integration (0.15-0.18)
-- **Specialized Components**:
-  - Layer 30, Head 10 focuses on higher-order relationships
-  - A cluster of heads in layers 25-35 forms a mathematical processing network
+**Key Circuits by Model Size:**
 
-<img src="../results/gpt2-large/mathematical/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 Large: Mathematical Attention"/>
+GPT-2 Small (12 layers):
+- Layer 10, Head 2
+- Layer 9, Head 8 
+- Layer 10, Head 6
 
-##### GPT-2 XL (48 layers, 25 heads)
-- **Main Mathematical Network**:
-  - Layer 35, Head 5 maintains consistent strong activation (0.15-0.18)
-  - Layer 40, Head 20 shows specialized mathematical processing (0.12-0.15)
-- **Supporting Circuits**:
-  - Distributed activation pattern across heads 15-20 in layers 30-40
-  - Multiple redundant circuits with similar activation patterns
+GPT-2 Medium (24 layers):
+- Layer 17, Head 0
+- Layer 19, Head 12
+- Layer 18, Head 13
 
-<img src="../results/gpt2-xl/mathematical/activation_patching_attn_head_out_avg.png" width="300" height="300" alt="GPT-2 XL: Mathematical Attention"/>
+GPT-2 Large (36 layers):
+- Layer 25, Head 3
+- Layer 25, Head 5
+- Layer 24, Head 15
 
-#### Key Circuit Characteristics
-
-1. **Activation Strength**
-- Small: Concentrated, high-magnitude activations (0.25-0.30)
-- Medium: More distributed but still distinct activations (0.15-0.25)
-- Large/XL: Lower individual activation magnitudes (0.12-0.20) but more coordinated circuits
-
-2. **Circuit Organization**
-- Small: Isolated strong heads with clear peaks
-- Medium: Emerging head clusters with coordinated activation
-- Large: Interconnected processing networks across multiple layers
-- XL: Redundant, distributed circuits with consistent patterns
-
-3. **Consistency**
-- All models show remarkable consistency in core mathematical head activations
-- Larger models exhibit more stable patterns with redundant processing paths
+GPT-2 XL (48 layers):
+- Layer 36, Head 11
+- Layer 35, Head 20
+- Layer 40, Heads 15-17
 
 ### Discussion
 
 The activation patching analysis reveals that mathematical processing relies on deeper layers compared to semantic and causal reasoning. While smaller models concentrate mathematical processing in a few powerful heads, larger models distribute this functionality across interconnected circuits. This architectural difference suggests a transition from single-point processing to more robust, distributed mathematical analysis as models scale.
 
 The presence of consistent activation patterns across different mathematical contexts indicates these circuits are fundamental to the models' mathematical processing capabilities rather than artifacts of specific inputs. The evolution from concentrated to distributed processing may explain larger models' improved robustness in mathematical tasks.
-
-### Template-Specific Insights
-
-1. **Basic Arithmetic Processing**
-   - Most concentrated activation patterns
-   - Clear progression from single-head to distributed processing
-   - Consistent core heads across model scales
-
-2. **Symbolic Manipulation**
-   - More distributed processing than basic arithmetic
-   - Emergence of specialized sub-circuits in larger models
-   - Strong cross-layer interactions
-
-3. **Logical Deduction**
-   - Most distributed processing patterns
-   - Complex multi-hop reasoning circuits
-   - Highest degree of redundancy in larger models
-
-### Cross-Model Observations
-
-1. **Processing Distribution**
-   - Small: Concentrated processing in few heads
-   - Medium: Emerging distributed patterns
-   - Large: Sophisticated networks with specialization
-   - XL: Highly redundant, robust processing
-
-2. **Activation Strength Patterns**
-   - Basic Arithmetic: Strongest individual activations
-   - Symbolic Manipulation: Moderate, distributed activation
-   - Logical Deduction: Lower but more coordinated activation
-
-3. **Architectural Evolution**
-   - Increasing redundancy with scale
-   - More sophisticated cross-layer interactions
-   - Greater specialization of sub-circuits
-
-This detailed analysis reveals that mathematical processing becomes increasingly sophisticated and robust as models scale up, with different types of mathematical operations engaging distinct but overlapping circuits. The progression from concentrated to distributed processing suggests an evolution toward more robust mathematical reasoning capabilities.
 
 ## Future Work
 
@@ -325,48 +247,40 @@ By systematically analyzing how LLMs process causal, semantic, and mathematical 
 
 ## Appendix A: Analysis of "So" Causal Marker
 
-Our analysis of the "so" causal marker revealed distinct processing patterns compared to "because", while maintaining similar scaling trends across model sizes.
+Our analysis of the "so" causal marker revealed similar processing patterns to "because", while maintaining similar scaling trends across model sizes.
 
-### GPT-2 Small
-- Peak attention to "so" appears in early layers (≈0.10-0.12 attention weight)
-- Processing is more distributed compared to "because"
-- Cause-to-Effect attention shows moderate activation in layers 0-2
+**Figure A1: Attention to "So" Token Across Model Scales**
+<table>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Small</strong><br/>
+<img src="../results/gpt2-small/attention_map_delim_so.png" width="300" height="300" alt="GPT-2 Small: Attention to 'so'"/></td>
+<td style="text-align: center;"><strong>GPT-2 Medium</strong><br/>
+<img src="../results/gpt2-medium/attention_map_delim_so.png" width="300" height="300" alt="GPT-2 Medium: Attention to 'so'"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Large</strong><br/>
+<img src="../results/gpt2-large/attention_map_delim_so.png" width="300" height="300" alt="GPT-2 Large: Attention to 'so'"/></td>
+<td style="text-align: center;"><strong>GPT-2 XL</strong><br/>
+<img src="../results/gpt2-xl/attention_map_delim_so.png" width="300" height="300" alt="GPT-2 XL: Attention to 'so'"/></td>
+</tr>
+</table>
 
-<img src="../results/gpt2-small/attention_map_delim_so.png" width="300" height="300" alt="GPT-2 Small: Attention to 'so'"/>
-<img src="../results/gpt2-small/attention_map_cause_effect_so.png" width="300" height="300" alt="GPT-2 Small: Cause-to-Effect Attention"/>
+**Figure A2: Cause-to-Effect Attention Patterns Across Model Scales**
 
-### GPT-2 Medium
-- Multiple attention peaks across layers 9-10 (≈0.10-0.12 attention weight)
-- More distributed processing compared to Small
-- Secondary processing emerges in middle layers
-
-<img src="../results/gpt2-medium/attention_map_delim_so.png" width="300" height="300" alt="GPT-2 Medium: Attention to 'so'"/>
-<img src="../results/gpt2-medium/attention_map_cause_effect_so.png" width="300" height="300" alt="GPT-2 Medium: Cause-to-Effect Attention"/>
-
-### GPT-2 Large
-- Multiple moderate peaks (≈0.15-0.175) across layers 6-16
-- More sophisticated cross-attention patterns
-- Distinct head clusters for Cause-to-Effect processing
-
-<img src="../results/gpt2-large/attention_map_delim_so.png" width="300" height="300" alt="GPT-2 Large: Attention to 'so'"/>
-<img src="../results/gpt2-large/attention_map_cause_effect_so.png" width="300" height="300" alt="GPT-2 Large: Cause-to-Effect Attention"/>
-
-### GPT-2 XL
-- Distributed processing with distinct peaks in layers 6, 14, and 20 (≈0.15-0.175)
-- Complex multi-hop reasoning patterns
-- Highly specialized head clusters for different aspects of processing
-
-<img src="../results/gpt2-xl/attention_map_delim_so.png" width="300" height="300" alt="GPT-2 XL: Attention to 'so'"/>
-<img src="../results/gpt2-xl/attention_map_cause_effect_so.png" width="300" height="300" alt="GPT-2 XL: Cause-to-Effect Attention"/>
-
-### Key Differences from "Because" Processing
-1. More distributed attention patterns across layers
-2. Generally lower peak attention weights
-3. Less distinct separation between processing stages
-4. More overlap between delimiter attention and directional processing
-5. Similar scaling trends but with less pronounced specialization
-
-These differences suggest that "so" may require more complex processing due to its broader range of semantic uses compared to "because".
+<table>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Small</strong><br/>
+<img src="../results/gpt2-small/attention_map_cause_effect_so.png" width="300" height="300" alt="GPT-2 Small: Cause-to-Effect Attention"/></td>
+<td style="text-align: center;"><strong>GPT-2 Medium</strong><br/>
+<img src="../results/gpt2-medium/attention_map_cause_effect_so.png" width="300" height="300" alt="GPT-2 Medium: Cause-to-Effect Attention"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>GPT-2 Large</strong><br/>
+<img src="../results/gpt2-large/attention_map_cause_effect_so.png" width="300" height="300" alt="GPT-2 Large: Cause-to-Effect Attention"/></td>
+<td style="text-align: center;"><strong>GPT-2 XL</strong><br/>
+<img src="../results/gpt2-xl/attention_map_cause_effect_so.png" width="300" height="300" alt="GPT-2 XL: Cause-to-Effect Attention"/></td>
+</tr>
+</table>
 
 ## Appendix B: Per-Template Semantic Processing Results
 
@@ -374,168 +288,107 @@ Our main analysis presents averaged results across all semantic templates. Here,
 
 ### Template Types
 
-1. **Direct Relationships**: "X is related to Y"
-2. **Categorical**: "X is a type of Y"
-3. **Property-based**: "X has property Y"
-4. **Functional**: "X is used for Y"
+1. **Action-Location-Because (ALB)**: "John had to [action] because he is going to the [location]"
+   - Examples: "dress/show", "shave/meeting", "study/exam"
+   - Tests causal relationships between actions and destinations
+
+2. **Action-Object-Because (AOB)**: "Jane will [action] it because John is getting the [object]"
+   - Examples: "read/book", "eat/food", "slice/bread"
+   - Tests causal relationships between actions and objects
+
+3. **Action-Location-So (ALS & ALS-2)**:
+   - ALS: "Mary went to the [location] so she wants to [action]"
+   - ALS-2: "Nadia will be at the [location] so she will [action]"
+   - Examples: "store/shop", "church/pray", "airport/fly"
+   - Tests location-driven behavioral intentions
+
+4. **Action-Object-So (AOS)**: "Sara wanted to [action] so Mark decided to get the [object]"
+   - Examples: "study/book", "paint/canvas", "write/pen"
+   - Tests object requirements for intended actions
 
 ### Individual Template Results
 
 #### GPT-2 Small
-- **Direct Relationships**:
-  - Peak activation in layer 8, head 8 (0.18-0.22)
-  - Secondary activation in layer 3, head 3 (0.12-0.15)
 
-<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_all_pos_ALB.png" width="300" height="300" alt="GPT-2 Small: Direct Relationships"/>
-
-- **Categorical**:
-  - Strongest activation in layer 8, head 8 (0.16-0.20)
-  - Supporting activation in layer 3, head 3 (0.10-0.14)
-
-<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_all_pos_ALS.png" width="300" height="300" alt="GPT-2 Small: Categorical"/>
-
-- **Property-based**:
-  - Primary activation in layer 8, head 8 (0.15-0.19)
-  - Consistent secondary pattern in layer 3, head 3 (0.11-0.13)
-
-<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_all_pos_ALS-2.png" width="300" height="300" alt="GPT-2 Small: Property-based"/>
-
-- **Functional**:
-  - Main activation in layer 8, head 8 (0.14-0.18)
-  - Supporting circuit in layer 3, head 3 (0.09-0.12)
-
-<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_all_pos_AOB.png" width="300" height="300" alt="GPT-2 Small: Functional"/>
-
-- **Functional**:
-  - Main activation in layer 8, head 8 (0.14-0.18)
-  - Supporting circuit in layer 3, head 3 (0.09-0.12)
-
-<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_all_pos_AOS.png" width="300" height="300" alt="GPT-2 Small: Functional"/>
+**Figure 1: GPT-2 Small Activation Patterns**
+<table>
+<tr>
+<td style="text-align: center;"><strong>ALB</strong><br/>
+<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_all_pos_ALB.png" width="300" height="300" alt="GPT-2 Small: Direct Relationships"/></td>
+<td style="text-align: center;"><strong>AOB</strong><br/>
+<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_all_pos_AOB.png" width="300" height="300" alt="GPT-2 Small: Direct Relationships"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>ALS</strong><br/>
+<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_all_pos_ALS.png" width="300" height="300" alt="GPT-2 Small: Categorical"/></td>
+<td style="text-align: center;"><strong>ALS-2</strong><br/>
+<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_all_pos_ALS-2.png" width="300" height="300" alt="GPT-2 Small: Property-based"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>AOS</strong><br/>
+<img src="../results/gpt2-small/paper_templates/activation_patching_attn_head_out_all_pos_AOS.png" width="300" height="300" alt="GPT-2 Small: Functional"/></td>
+</tr>
+</table>
 
 #### GPT-2 Medium
-- **Direct Relationships**:
-  - Peak activation in layer 19, head 0 (0.16-0.20)
-  - Secondary activation in layer 13, head 3 (0.14-0.16)
-
-<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_all_pos_ALB.png" width="300" height="300" alt="GPT-2 Medium: Direct Relationships"/>
-
-- **Categorical**:
-  - Strongest activation in layer 19, head 0 (0.15-0.18)
-  - Supporting activation in layer 13, head 3 (0.12-0.15)
-
-<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_all_pos_ALS.png" width="300" height="300" alt="GPT-2 Medium: Categorical"/>
-
-- **Property-based**:
-  - Primary activation in layer 19, head 0 (0.14-0.17)
-  - Consistent pattern in layer 13, head 3 (0.11-0.14)
-  - Additional support from layer 20, head 14 (0.09-0.11)
-
-<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_all_pos_ALS-2.png" width="300" height="300" alt="GPT-2 Medium: Property-based"/>
-
-- **Functional**:
-  - Main activation in layer 19, head 0 (0.13-0.16)
-  - Supporting circuit in layer 13, head 3 (0.10-0.13)
-  - Auxiliary processing in layers 20-22, heads 14-15
-
-<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_all_pos_AOB.png" width="300" height="300" alt="GPT-2 Medium: Functional"/>
-
-- **Functional**:
-  - Main activation in layer 19, head 0 (0.13-0.16)
-  - Supporting circuit in layer 13, head 3 (0.10-0.13)
-  - Auxiliary processing in layers 20-22, heads 14-15
-
-<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_all_pos_AOS.png" width="300" height="300" alt="GPT-2 Medium: Functional"/>
+<table>
+<tr>
+<td style="text-align: center;"><strong>ALB</strong><br/>
+<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_all_pos_ALB.png" width="300" height="300" alt="GPT-2 Medium: Direct Relationships"/></td>
+<td style="text-align: center;"><strong>AOB</strong><br/>
+<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_all_pos_AOB.png" width="300" height="300" alt="GPT-2 Medium: Direct Relationships"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>ALS</strong><br/>
+<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_all_pos_ALS.png" width="300" height="300" alt="GPT-2 Medium: Categorical"/></td>
+<td style="text-align: center;"><strong>ALS-2</strong><br/>
+<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_all_pos_ALS-2.png" width="300" height="300" alt="GPT-2 Medium: Property-based"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>AOS</strong><br/>
+<img src="../results/gpt2-medium/paper_templates/activation_patching_attn_head_out_all_pos_AOS.png" width="300" height="300" alt="GPT-2 Medium: Functional"/></td>
+</tr>
+</table>
 
 #### GPT-2 Large
-- **Direct Relationships**:
-  - Primary activation in layer 30, head 5 (0.14-0.16)
-  - Strong support from layer 25, head 2 (0.11-0.13)
-  - Specialized processing in layer 35, head 15 (0.09-0.11)
-
-<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_all_pos_ALB.png" width="300" height="300" alt="GPT-2 Large: Direct Relationships"/>
-
-- **Categorical**:
-  - Peak activation in layer 30, head 5 (0.13-0.15)
-  - Consistent activation in layer 25, head 2 (0.10-0.12)
-  - Network of supporting heads in layers 27-32
-
-<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_all_pos_ALS.png" width="300" height="300" alt="GPT-2 Large: Categorical"/>
-
-- **Property-based**:
-  - Strong activation in layer 30, head 5 (0.12-0.14)
-  - Supporting circuit in layer 25, head 2 (0.09-0.11)
-  - Distributed processing across layers 27-32
-
-<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_all_pos_ALS-2.png" width="300" height="300" alt="GPT-2 Large: Property-based"/>
-
-- **Functional**:
-  - Main activation cluster in layer 30, head 5 (0.11-0.13)
-  - Complex network activation in layers 25-35
-  - Multiple supporting heads with consistent patterns
-
-<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_all_pos_AOB.png" width="300" height="300" alt="GPT-2 Large: Functional"/>
-
-- **Functional**:
-  - Main activation cluster in layer 30, head 5 (0.11-0.13)
-  - Complex network activation in layers 25-35
-  - Multiple supporting heads with consistent patterns
-
-<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_all_pos_AOS.png" width="300" height="300" alt="GPT-2 Large: Functional"/>
+<table>
+<tr>
+<td style="text-align: center;"><strong>ALB</strong><br/>
+<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_all_pos_ALB.png" width="300" height="300" alt="GPT-2 Large: Direct Relationships"/></td>
+<td style="text-align: center;"><strong>AOB</strong><br/>
+<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_all_pos_AOB.png" width="300" height="300" alt="GPT-2 Large: Direct Relationships"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>ALS</strong><br/>
+<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_all_pos_ALS.png" width="300" height="300" alt="GPT-2 Large: Categorical"/></td>
+<td style="text-align: center;"><strong>ALS-2</strong><br/>
+<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_all_pos_ALS-2.png" width="300" height="300" alt="GPT-2 Large: Property-based"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>AOS</strong><br/>
+<img src="../results/gpt2-large/paper_templates/activation_patching_attn_head_out_all_pos_AOS.png" width="300" height="300" alt="GPT-2 Large: Functional"/></td>
+</tr>
+</table>
 
 #### GPT-2 XL
-- **Direct Relationships**:
-  - Consistent activation in layer 30, head 5 (0.10-0.12)
-  - Specialized processing in layer 40, head 20 (0.08-0.10)
-  - Distributed network across heads 15-18 in layers 25-35
-
-<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_all_pos_ALB.png" width="300" height="300" alt="GPT-2 XL: Direct Relationships"/>
-
-- **Categorical**:
-  - Primary activation in layer 30, head 5 (0.09-0.11)
-  - Complex processing network in layers 25-35
-  - Multiple redundant circuits with similar patterns
-
-<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_all_pos_ALS.png" width="300" height="300" alt="GPT-2 XL: Categorical"/>
-
-- **Property-based**:
-  - Core activation in layer 30, head 5 (0.08-0.10)
-  - Sophisticated network across layers 25-40
-  - Highly distributed processing with redundant pathways
-
-<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_all_pos_ALS-2.png" width="300" height="300" alt="GPT-2 XL: Property-based"/>
-
-- **Functional**:
-  - Distributed activation across multiple head clusters
-  - Primary processing in layers 25-40
-  - Multiple parallel processing pathways with similar patterns
-
-<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_all_pos_AOB.png" width="300" height="300" alt="GPT-2 XL: Functional"/>
-
-- **Functional**:
-  - Distributed activation across multiple head clusters
-  - Primary processing in layers 25-40
-  - Multiple parallel processing pathways with similar patterns
-
-<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_all_pos_AOS.png" width="300" height="300" alt="GPT-2 XL: Functional"/>
-
-### Key Observations from Template Analysis
-
-1. **Consistency Across Templates**
-   - Core semantic processing heads maintain their roles across all template types
-   - Activation magnitudes vary slightly but patterns remain stable
-   - Larger models show more consistent activation patterns across templates
-
-2. **Template-Specific Variations**
-   - Direct relationship templates show strongest activations
-   - Categorical relationships engage slightly different supporting heads
-   - Property-based and functional templates show more distributed processing
-
-3. **Scaling Effects**
-   - Template-specific variations decrease as model size increases
-   - Larger models show more uniform processing across template types
-   - Supporting circuits become more specialized in larger models
-
-This detailed breakdown confirms that while there are minor variations in how different semantic relationships are processed, the core semantic circuits we identified in the main analysis remain consistent across all template types.
+<table>
+<tr>
+<td style="text-align: center;"><strong>ALB</strong><br/>
+<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_all_pos_ALB.png" width="300" height="300" alt="GPT-2 XL: Direct Relationships"/></td>
+<td style="text-align: center;"><strong>AOB</strong><br/>
+<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_all_pos_AOB.png" width="300" height="300" alt="GPT-2 XL: Direct Relationships"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>ALS</strong><br/>
+<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_all_pos_ALS.png" width="300" height="300" alt="GPT-2 XL: Categorical"/></td>
+<td style="text-align: center;"><strong>ALS-2</strong><br/>
+<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_all_pos_ALS-2.png" width="300" height="300" alt="GPT-2 XL: Property-based"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>AOS</strong><br/>
+<img src="../results/gpt2-xl/paper_templates/activation_patching_attn_head_out_all_pos_AOS.png" width="300" height="300" alt="GPT-2 XL: Functional"/></td>
+</tr>
+</table>
 
 ## Appendix C: Per-Template Mathematical Processing Results
 
@@ -543,150 +396,101 @@ Our main analysis presents averaged results across all mathematical templates. H
 
 ### Template Types
 
-1. **Basic Arithmetic**: "What is X + Y?"
-2. **Symbolic Manipulation**: "Solve for X in equation Y"
-3. **Logical Deduction**: "If A then B, if B then C, what follows?"
+1. **Basic Addition Templates**
+   - MATH-B-1: "John had {X} apples but now has 10 because Mary gave him {Y}"
+   - MATH-B-2: "Tom started with {X} marbles but now has 8 because his friend gave him {Y}"
+   - Tests understanding of addition through story problems
+   - Example pairs: [1,9], [8,2], [6,4], etc.
+
+2. **Subtraction Templates**
+   - MATH-S-1: "Alice had {X} cookies so after eating 2 she now has {Y}"
+   - MATH-S-2: "Bob had {X} dollars so after buying a toy for 3 dollars he has {Y}"
+   - MATH-S-3: "Sarah has {X} candies so after giving 4 to her friend she has {Y}"
+   - Tests understanding of subtraction through story problems
+   - Example pairs: [5,3], [7,5], [4,2], etc.
 
 ### Individual Template Results
 
 #### GPT-2 Small
-- **Basic Arithmetic**:
-  - Peak activation in layer 17, head 0 (0.25-0.30)
-  - Secondary activation in layer 19, head 12 (0.20-0.25)
-
-<img src="../results/gpt2-small/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-1.png" width="300" height="300" alt="GPT-2 Small: Basic Arithmetic"/>
-
-- **Symbolic Manipulation**:
-  - Strongest activation in layer 17, head 0 (0.20-0.25)
-  - Supporting activation in layer 19, head 12 (0.15-0.20)
-
-<img src="../results/gpt2-small/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-1.png" width="300" height="300" alt="GPT-2 Small: Symbolic Manipulation"/>
-
-- **Logical Deduction**:
-  - Primary activation in layer 17, head 0 (0.20-0.25)
-  - Complex network activation in layers 15-20
-
-<img src="../results/gpt2-small/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-2.png" width="300" height="300" alt="GPT-2 Small: Logical Deduction"/>
-
-- **Logical Deduction**:
-  - Primary activation in layer 17, head 0 (0.20-0.25)
-  - Complex network activation in layers 15-20
-
-<img src="../results/gpt2-small/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-3.png" width="300" height="300" alt="GPT-2 Small: Logical Deduction"/>
+<table>
+<tr>
+<td style="text-align: center;"><strong>MATH-B-1</strong><br/>
+<img src="../results/gpt2-small/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-1.png" width="300" height="300" alt="GPT-2 Small: Basic Addition"/></td>
+<td style="text-align: center;"><strong>MATH-B-2</strong><br/>
+<img src="../results/gpt2-small/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-2.png" width="300" height="300" alt="GPT-2 Small: Basic Addition"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>MATH-S-1</strong><br/>
+<img src="../results/gpt2-small/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-1.png" width="300" height="300" alt="GPT-2 Small: Subtraction"/></td>
+<td style="text-align: center;"><strong>MATH-S-2</strong><br/>
+<img src="../results/gpt2-small/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-2.png" width="300" height="300" alt="GPT-2 Small: Subtraction"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>MATH-S-3</strong><br/>
+<img src="../results/gpt2-small/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-3.png" width="300" height="300" alt="GPT-2 Small: Subtraction"/></td>
+</tr>
+</table>
 
 #### GPT-2 Medium
-- **Basic Arithmetic**:
-  - Peak activation in layer 25, head 3 (0.20-0.25)
-  - Secondary activation in layer 30, head 15 (0.15-0.20)
-  - Distributed processing across layers 25-30
-
-<img src="../results/gpt2-medium/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-1.png" width="300" height="300" alt="GPT-2 Medium: Basic Arithmetic"/>
-
-- **Symbolic Manipulation**:
-  - Primary activation in layer 25, head 3 (0.18-0.22)
-  - Supporting network in layers 25-30, heads 12-14
-  - Complex cross-layer interactions
-
-<img src="../results/gpt2-medium/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-1.png" width="300" height="300" alt="GPT-2 Medium: Symbolic Manipulation"/>
-
-- **Logical Deduction**:
-  - Strong activation in layer 25, head 3 (0.15-0.20)
-  - Sophisticated network activation in layers 20-30
-  - Multiple supporting heads with coordinated patterns
-
-<img src="../results/gpt2-medium/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-2.png" width="300" height="300" alt="GPT-2 Medium: Logical Deduction"/>
-
-- **Logical Deduction**:
-  - Strong activation in layer 25, head 3 (0.15-0.20)
-  - Sophisticated network activation in layers 20-30
-  - Multiple supporting heads with coordinated patterns
-
-<img src="../results/gpt2-medium/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-3.png" width="300" height="300" alt="GPT-2 Medium: Logical Deduction"/>
+<table>
+<tr>
+<td style="text-align: center;"><strong>MATH-B-1</strong><br/>
+<img src="../results/gpt2-medium/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-1.png" width="300" height="300" alt="GPT-2 Medium: Basic Addition"/></td>
+<td style="text-align: center;"><strong>MATH-B-2</strong><br/>
+<img src="../results/gpt2-medium/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-2.png" width="300" height="300" alt="GPT-2 Medium: Basic Addition"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>MATH-S-1</strong><br/>
+<img src="../results/gpt2-medium/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-1.png" width="300" height="300" alt="GPT-2 Medium: Subtraction"/></td>
+<td style="text-align: center;"><strong>MATH-S-2</strong><br/>
+<img src="../results/gpt2-medium/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-2.png" width="300" height="300" alt="GPT-2 Medium: Subtraction"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>MATH-S-3</strong><br/>
+<img src="../results/gpt2-medium/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-3.png" width="300" height="300" alt="GPT-2 Medium: Subtraction"/></td>
+</tr>
+</table>
 
 #### GPT-2 Large
-- **Basic Arithmetic**:
-  - Primary activation in layer 25, head 5 (0.18-0.20)
-  - Strong integration in layer 35, head 15 (0.15-0.18)
-  - Distributed processing network across layers 25-35
-
-<img src="../results/gpt2-large/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-1.png" width="300" height="300" alt="GPT-2 Large: Basic Arithmetic"/>
-
-- **Symbolic Manipulation**:
-  - Peak activation in layer 25, head 5 (0.15-0.18)
-  - Complex network in layers 25-35
-  - Multiple specialized heads for different equation components
-
-<img src="../results/gpt2-large/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-1.png" width="300" height="300" alt="GPT-2 Large: Symbolic Manipulation"/>
-
-- **Logical Deduction**:
-  - Core activation in layer 25, head 5 (0.15-0.18)
-  - Sophisticated processing network across layers 25-40
-  - Highly distributed reasoning patterns
-
-<img src="../results/gpt2-large/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-2.png" width="300" height="300" alt="GPT-2 Large: Logical Deduction"/>
+<table>
+<tr>
+<td style="text-align: center;"><strong>MATH-B-1</strong><br/>
+<img src="../results/gpt2-large/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-1.png" width="300" height="300" alt="GPT-2 Large: Basic Addition"/></td>
+<td style="text-align: center;"><strong>MATH-B-2</strong><br/>
+<img src="../results/gpt2-large/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-2.png" width="300" height="300" alt="GPT-2 Large: Basic Addition"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>MATH-S-1</strong><br/>
+<img src="../results/gpt2-large/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-1.png" width="300" height="300" alt="GPT-2 Large: Subtraction"/></td>
+<td style="text-align: center;"><strong>MATH-S-2</strong><br/>
+<img src="../results/gpt2-large/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-2.png" width="300" height="300" alt="GPT-2 Large: Subtraction"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>MATH-S-3</strong><br/>
+<img src="../results/gpt2-large/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-3.png" width="300" height="300" alt="GPT-2 Large: Subtraction"/></td>
+</tr>
+</table>
 
 #### GPT-2 XL
-- **Basic Arithmetic**:
-  - Consistent activation in layer 35, head 5 (0.15-0.18)
-  - Specialized processing in layer 40, head 20 (0.12-0.15)
-  - Distributed network across multiple layer ranges
+<table>
+<tr>
+<td style="text-align: center;"><strong>MATH-B-1</strong><br/>
+<img src="../results/gpt2-xl/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-1.png" width="300" height="300" alt="GPT-2 XL: Basic Addition"/></td>
+<td style="text-align: center;"><strong>MATH-B-2</strong><br/>
+<img src="../results/gpt2-xl/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-2.png" width="300" height="300" alt="GPT-2 XL: Basic Addition"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>MATH-S-1</strong><br/>
+<img src="../results/gpt2-xl/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-1.png" width="300" height="300" alt="GPT-2 XL: Subtraction"/></td>
+<td style="text-align: center;"><strong>MATH-S-2</strong><br/>
+<img src="../results/gpt2-xl/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-2.png" width="300" height="300" alt="GPT-2 XL: Subtraction"/></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>MATH-S-3</strong><br/>
+<img src="../results/gpt2-xl/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-3.png" width="300" height="300" alt="GPT-2 XL: Subtraction"/></td>
+</tr>
+</table>
 
-<img src="../results/gpt2-xl/mathematical/activation_patching_attn_head_out_all_pos_MATH-B-1.png" width="300" height="300" alt="GPT-2 XL: Basic Arithmetic"/>
 
-- **Symbolic Manipulation**:
-  - Primary activation in layer 35, head 5 (0.12-0.15)
-  - Complex processing network in layers 30-45
-  - Multiple redundant circuits with similar patterns
 
-<img src="../results/gpt2-xl/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-1.png" width="300" height="300" alt="GPT-2 XL: Symbolic Manipulation"/>
 
-- **Logical Deduction**:
-  - Core activation in layer 35, head 5 (0.10-0.12)
-  - Sophisticated network across layers 30-45
-  - Highly distributed processing with redundant pathways
-
-<img src="../results/gpt2-xl/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-2.png" width="300" height="300" alt="GPT-2 XL: Logical Deduction"/>
-
-- **Logical Deduction**:
-  - Core activation in layer 35, head 5 (0.10-0.12)
-  - Sophisticated network across layers 30-45
-  - Highly distributed processing with redundant pathways
-
-<img src="../results/gpt2-xl/mathematical/activation_patching_attn_head_out_all_pos_MATH-S-3.png" width="300" height="300" alt="GPT-2 XL: Logical Deduction"/>
-
-### Template-Specific Insights
-
-1. **Basic Arithmetic Processing**
-   - Most concentrated activation patterns
-   - Clear progression from single-head to distributed processing
-   - Consistent core heads across model scales
-
-2. **Symbolic Manipulation**
-   - More distributed processing than basic arithmetic
-   - Emergence of specialized sub-circuits in larger models
-   - Strong cross-layer interactions
-
-3. **Logical Deduction**
-   - Most distributed processing patterns
-   - Complex multi-hop reasoning circuits
-   - Highest degree of redundancy in larger models
-
-### Cross-Model Observations
-
-1. **Processing Distribution**
-   - Small: Concentrated processing in few heads
-   - Medium: Emerging distributed patterns
-   - Large: Sophisticated networks with specialization
-   - XL: Highly redundant, robust processing
-
-2. **Activation Strength Patterns**
-   - Basic Arithmetic: Strongest individual activations
-   - Symbolic Manipulation: Moderate, distributed activation
-   - Logical Deduction: Lower but more coordinated activation
-
-3. **Architectural Evolution**
-   - Increasing redundancy with scale
-   - More sophisticated cross-layer interactions
-   - Greater specialization of sub-circuits
-
-This detailed analysis reveals that mathematical processing becomes increasingly sophisticated and robust as models scale up, with different types of mathematical operations engaging distinct but overlapping circuits. The progression from concentrated to distributed processing suggests an evolution toward more robust mathematical reasoning capabilities.
